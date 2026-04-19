@@ -1,0 +1,302 @@
+{
+  "metadata": {
+    "id": "unstable-bradycardia-v1",
+    "title": "Unstable Bradycardia: Deliberate Pacing Setup",
+    "presentationTitle": "Dizzy, Diaphoretic, and Hypotensive",
+    "category": "Bradycardia",
+    "estimatedMinutes": 8,
+    "learningObjectives": [
+      "Separate monitor leads from therapy pads",
+      "Obtain vascular access before IV medications",
+      "Escalate from atropine to pacing when instability persists",
+      "Configure pacing and verify capture intentionally"
+    ]
+  },
+  "defaultMode": "realistic",
+  "modes": ["guided", "realistic", "instructor"],
+  "timings": {
+    "transferToBed": { "guided": 20, "realistic": 30, "instructor": 35 },
+    "emsHandoff": { "guided": 15, "realistic": 22, "instructor": 28 },
+    "attachLeads": { "guided": 10, "realistic": 16, "instructor": 20 },
+    "attachPads": { "guided": 14, "realistic": 21, "instructor": 25 },
+    "startOxygen": { "guided": 5, "realistic": 8, "instructor": 10 },
+    "establishIV": { "guided": 20, "realistic": 32, "instructor": 40 },
+    "establishIO": { "guided": 16, "realistic": 25, "instructor": 30 }
+  },
+  "initialState": {
+    "patient": {
+      "hr": 34,
+      "systolicBP": 78,
+      "diastolicBP": 48,
+      "spo2": 93,
+      "rr": 18,
+      "rhythm": "sinus_bradycardia",
+      "hasPulse": true,
+      "mentalStatus": "verbal",
+      "statusText": "Patient is pale, dizzy, and increasingly drowsy."
+    },
+    "environment": {
+      "onBed": false,
+      "monitorLeadsAttached": false,
+      "defibPadsAttached": false,
+      "syncEnabled": false,
+      "oxygenOn": false,
+      "ivAccess": false,
+      "ioAccess": false,
+      "pacingModeActive": false,
+      "pacingRate": null,
+      "pacingCurrentMa": null,
+      "captureConfirmed": false,
+      "cardioversionEnergyJ": null
+    }
+  },
+  "actions": [
+    {
+      "id": "start_transfer_to_bed",
+      "label": "Transfer Patient to Bed",
+      "category": "communication",
+      "kind": "task",
+      "taskTimingKey": "transferToBed"
+    },
+    {
+      "id": "start_ems_handoff",
+      "label": "Start EMS Handoff",
+      "category": "communication",
+      "kind": "task",
+      "taskTimingKey": "emsHandoff"
+    },
+    {
+      "id": "attach_monitor_leads",
+      "label": "Attach Monitor Leads",
+      "category": "monitoring",
+      "kind": "task",
+      "taskTimingKey": "attachLeads",
+      "majorBeat": true
+    },
+    {
+      "id": "attach_defib_pads",
+      "label": "Attach Defibrillator Pads",
+      "category": "electrical",
+      "kind": "task",
+      "taskTimingKey": "attachPads",
+      "majorBeat": true
+    },
+    {
+      "id": "start_oxygen",
+      "label": "Apply Supplemental Oxygen",
+      "category": "airway",
+      "kind": "task",
+      "taskTimingKey": "startOxygen"
+    },
+    {
+      "id": "establish_iv",
+      "label": "Establish IV Access",
+      "category": "access",
+      "kind": "task",
+      "taskTimingKey": "establishIV",
+      "majorBeat": true
+    },
+    {
+      "id": "establish_io",
+      "label": "Establish IO Access",
+      "category": "access",
+      "kind": "task",
+      "taskTimingKey": "establishIO"
+    },
+    {
+      "id": "give_atropine",
+      "label": "Give Atropine 1 mg IV/IO",
+      "category": "medication",
+      "kind": "instant",
+      "majorBeat": true
+    },
+    {
+      "id": "toggle_sync_on",
+      "label": "Enable Sync Mode",
+      "category": "electrical",
+      "kind": "instant"
+    },
+    {
+      "id": "toggle_sync_off",
+      "label": "Disable Sync Mode",
+      "category": "electrical",
+      "kind": "instant",
+      "hidden": true
+    },
+    {
+      "id": "set_cardioversion_energy_100",
+      "label": "Set Cardioversion Energy 100J",
+      "category": "electrical",
+      "kind": "instant"
+    },
+    {
+      "id": "deliver_cardioversion",
+      "label": "Deliver Cardioversion",
+      "category": "electrical",
+      "kind": "instant"
+    },
+    {
+      "id": "start_pacing_mode",
+      "label": "Start Pacing Mode",
+      "category": "electrical",
+      "kind": "instant",
+      "majorBeat": true
+    },
+    {
+      "id": "set_pacing_rate_70",
+      "label": "Set Pacing Rate to 70",
+      "category": "electrical",
+      "kind": "instant",
+      "majorBeat": true
+    },
+    {
+      "id": "set_pacing_current_40",
+      "label": "Set Pacing Current to 40 mA",
+      "category": "electrical",
+      "kind": "instant"
+    },
+    {
+      "id": "set_pacing_current_70",
+      "label": "Set Pacing Current to 70 mA",
+      "category": "electrical",
+      "kind": "instant",
+      "majorBeat": true
+    },
+    {
+      "id": "confirm_capture",
+      "label": "Confirm Mechanical Capture",
+      "category": "electrical",
+      "kind": "instant",
+      "majorBeat": true
+    },
+    {
+      "id": "acknowledge_narrative",
+      "label": "Acknowledge Team Update",
+      "category": "communication",
+      "kind": "instant",
+      "hidden": true
+    }
+  ],
+  "gates": [
+    {
+      "id": "atropine_requires_access",
+      "type": "hard",
+      "action": "give_atropine",
+      "requires": ["hasVascularAccess"],
+      "message": "Cannot give IV/IO atropine without vascular access."
+    },
+    {
+      "id": "pacing_requires_pads",
+      "type": "hard",
+      "action": "start_pacing_mode",
+      "requires": ["defibPadsAttached"],
+      "message": "Attach defibrillator pads before pacing."
+    },
+    {
+      "id": "rate_requires_pacing_mode",
+      "type": "hard",
+      "action": "set_pacing_rate_70",
+      "requires": ["pacingModeActive"],
+      "message": "Start pacing mode before setting a pacing rate."
+    },
+    {
+      "id": "current40_requires_pacing_mode",
+      "type": "hard",
+      "action": "set_pacing_current_40",
+      "requires": ["pacingModeActive"],
+      "message": "Start pacing mode before setting pacing current."
+    },
+    {
+      "id": "current70_requires_pacing_mode",
+      "type": "hard",
+      "action": "set_pacing_current_70",
+      "requires": ["pacingModeActive"],
+      "message": "Start pacing mode before setting pacing current."
+    },
+    {
+      "id": "capture_requires_setup",
+      "type": "hard",
+      "action": "confirm_capture",
+      "requires": ["pacingModeActive", "pacingRateSet", "pacingCurrentSet"],
+      "message": "Configure pacing mode, rate, and current before capture check."
+    },
+    {
+      "id": "sync_for_cardioversion",
+      "type": "soft",
+      "action": "deliver_cardioversion",
+      "requires": ["syncEnabled"],
+      "message": "Cardioversion delivered without sync in a pulse rhythm.",
+      "penalty": 8,
+      "onFailureEffect": "worsen_hemodynamics"
+    }
+  ],
+  "narrativeBeats": [
+    {
+      "id": "early-pads-reminder",
+      "atSeconds": 60,
+      "message": "Nurse: Pacing will need pads on the chest first.",
+      "priority": "info"
+    },
+    {
+      "id": "access-reminder",
+      "atSeconds": 110,
+      "message": "Tech: We still need IV or IO before meds.",
+      "priority": "info",
+      "condition": "ifNoAccess"
+    },
+    {
+      "id": "pacing-escalation",
+      "atSeconds": 170,
+      "message": "Nurse: BP is dropping. We should escalate to pacing now.",
+      "priority": "urgent",
+      "condition": "ifNoPacingSetup",
+      "requiresAcknowledgement": true
+    },
+    {
+      "id": "capture-escalation",
+      "atSeconds": 240,
+      "message": "Tech: Electrical spikes are present, but do we have mechanical capture?",
+      "priority": "urgent",
+      "condition": "ifNoCapture",
+      "requiresAcknowledgement": true
+    }
+  ],
+  "outcomes": {
+    "deteriorateAfterSeconds": 600,
+    "maxPenaltyBeforeDeterioration": 24
+  },
+  "debriefRules": {
+    "criticalActions": [
+      "attach_monitor_leads",
+      "attach_defib_pads",
+      "give_atropine",
+      "start_pacing_mode",
+      "set_pacing_rate_70",
+      "set_pacing_current_70",
+      "confirm_capture"
+    ],
+    "goodDecisionActions": [
+      "start_transfer_to_bed",
+      "start_ems_handoff",
+      "start_oxygen",
+      "attach_monitor_leads",
+      "attach_defib_pads",
+      "establish_iv",
+      "give_atropine",
+      "start_pacing_mode",
+      "set_pacing_rate_70",
+      "set_pacing_current_70",
+      "confirm_capture"
+    ],
+    "algorithmDeviationActions": [
+      "deliver_cardioversion",
+      "set_pacing_current_40"
+    ]
+  },
+  "teachingPoints": [
+    "Leads provide rhythm information; pads provide electrical therapy capability.",
+    "Symptomatic unstable bradycardia with poor atropine response requires pacing escalation.",
+    "Capture requires both electrical setup and pulse confirmation, not just monitor spikes.",
+    "Parallel setup tasks reduce delay while preserving realistic workflow."
+  ]
+}

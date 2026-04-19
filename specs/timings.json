@@ -1,0 +1,37 @@
+{
+  "transferToBed": {
+    "guided": 20,
+    "realistic": 30,
+    "instructor": 35
+  },
+  "emsHandoff": {
+    "guided": 15,
+    "realistic": 22,
+    "instructor": 28
+  },
+  "attachLeads": {
+    "guided": 10,
+    "realistic": 16,
+    "instructor": 20
+  },
+  "attachPads": {
+    "guided": 14,
+    "realistic": 21,
+    "instructor": 25
+  },
+  "startOxygen": {
+    "guided": 5,
+    "realistic": 8,
+    "instructor": 10
+  },
+  "establishIV": {
+    "guided": 20,
+    "realistic": 32,
+    "instructor": 40
+  },
+  "establishIO": {
+    "guided": 16,
+    "realistic": 25,
+    "instructor": 30
+  }
+}

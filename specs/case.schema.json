@@ -1,0 +1,267 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acls-sim-v2/specs/case.schema.json",
+  "title": "ACLS Sim Case Definition V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "metadata",
+    "defaultMode",
+    "modes",
+    "timings",
+    "initialState",
+    "actions",
+    "gates",
+    "narrativeBeats",
+    "outcomes",
+    "debriefRules",
+    "teachingPoints"
+  ],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "presentationTitle", "category", "estimatedMinutes", "learningObjectives"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "presentationTitle": { "type": "string", "minLength": 1 },
+        "category": { "type": "string", "minLength": 1 },
+        "estimatedMinutes": { "type": "number", "minimum": 1 },
+        "learningObjectives": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "defaultMode": {
+      "type": "string",
+      "enum": ["guided", "realistic", "instructor"]
+    },
+    "modes": {
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "enum": ["guided", "realistic", "instructor"]
+      }
+    },
+    "timings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transferToBed", "emsHandoff", "attachLeads", "attachPads", "startOxygen", "establishIV", "establishIO"],
+      "properties": {
+        "transferToBed": { "$ref": "#/$defs/modeSeconds" },
+        "emsHandoff": { "$ref": "#/$defs/modeSeconds" },
+        "attachLeads": { "$ref": "#/$defs/modeSeconds" },
+        "attachPads": { "$ref": "#/$defs/modeSeconds" },
+        "startOxygen": { "$ref": "#/$defs/modeSeconds" },
+        "establishIV": { "$ref": "#/$defs/modeSeconds" },
+        "establishIO": { "$ref": "#/$defs/modeSeconds" }
+      }
+    },
+    "initialState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["patient", "environment"],
+      "properties": {
+        "patient": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["hr", "systolicBP", "diastolicBP", "spo2", "rr", "rhythm", "hasPulse", "mentalStatus", "statusText"],
+          "properties": {
+            "hr": { "type": "number", "minimum": 0 },
+            "systolicBP": { "type": "number", "minimum": 0 },
+            "diastolicBP": { "type": "number", "minimum": 0 },
+            "spo2": { "type": "number", "minimum": 0, "maximum": 100 },
+            "rr": { "type": "number", "minimum": 0 },
+            "rhythm": {
+              "type": "string",
+              "enum": ["sinus_bradycardia", "paced", "unstable_tachyarrhythmia"]
+            },
+            "hasPulse": { "type": "boolean" },
+            "mentalStatus": {
+              "type": "string",
+              "enum": ["alert", "verbal", "pain", "unresponsive"]
+            },
+            "statusText": { "type": "string", "minLength": 1 }
+          }
+        },
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "onBed",
+            "monitorLeadsAttached",
+            "defibPadsAttached",
+            "syncEnabled",
+            "oxygenOn",
+            "ivAccess",
+            "ioAccess",
+            "pacingModeActive",
+            "pacingRate",
+            "pacingCurrentMa",
+            "captureConfirmed",
+            "cardioversionEnergyJ"
+          ],
+          "properties": {
+            "onBed": { "type": "boolean" },
+            "monitorLeadsAttached": { "type": "boolean" },
+            "defibPadsAttached": { "type": "boolean" },
+            "syncEnabled": { "type": "boolean" },
+            "oxygenOn": { "type": "boolean" },
+            "ivAccess": { "type": "boolean" },
+            "ioAccess": { "type": "boolean" },
+            "pacingModeActive": { "type": "boolean" },
+            "pacingRate": { "type": ["number", "null"] },
+            "pacingCurrentMa": { "type": ["number", "null"] },
+            "captureConfirmed": { "type": "boolean" },
+            "cardioversionEnergyJ": { "type": ["number", "null"] }
+          }
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/actionDef" }
+    },
+    "gates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/gateDef" }
+    },
+    "narrativeBeats": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/narrativeBeat" }
+    },
+    "outcomes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deteriorateAfterSeconds", "maxPenaltyBeforeDeterioration"],
+      "properties": {
+        "deteriorateAfterSeconds": { "type": "number", "minimum": 1 },
+        "maxPenaltyBeforeDeterioration": { "type": "number", "minimum": 0 }
+      }
+    },
+    "debriefRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["criticalActions", "goodDecisionActions", "algorithmDeviationActions"],
+      "properties": {
+        "criticalActions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/actionType" }
+        },
+        "goodDecisionActions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/actionType" }
+        },
+        "algorithmDeviationActions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/actionType" }
+        }
+      }
+    },
+    "teachingPoints": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "modeSeconds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["guided", "realistic", "instructor"],
+      "properties": {
+        "guided": { "type": "number", "minimum": 1 },
+        "realistic": { "type": "number", "minimum": 1 },
+        "instructor": { "type": "number", "minimum": 1 }
+      }
+    },
+    "actionType": {
+      "type": "string",
+      "enum": [
+        "start_transfer_to_bed",
+        "start_ems_handoff",
+        "attach_monitor_leads",
+        "attach_defib_pads",
+        "start_oxygen",
+        "establish_iv",
+        "establish_io",
+        "give_atropine",
+        "toggle_sync_on",
+        "toggle_sync_off",
+        "set_cardioversion_energy_100",
+        "deliver_cardioversion",
+        "start_pacing_mode",
+        "set_pacing_rate_70",
+        "set_pacing_current_40",
+        "set_pacing_current_70",
+        "confirm_capture",
+        "acknowledge_narrative"
+      ]
+    },
+    "actionDef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "category", "kind"],
+      "properties": {
+        "id": { "$ref": "#/$defs/actionType" },
+        "label": { "type": "string", "minLength": 1 },
+        "category": {
+          "type": "string",
+          "enum": ["assessment", "monitoring", "access", "airway", "electrical", "medication", "communication"]
+        },
+        "kind": { "type": "string", "enum": ["task", "instant"] },
+        "taskTimingKey": {
+          "type": "string",
+          "enum": ["transferToBed", "emsHandoff", "attachLeads", "attachPads", "startOxygen", "establishIV", "establishIO"]
+        },
+        "description": { "type": "string" },
+        "majorBeat": { "type": "boolean" },
+        "hidden": { "type": "boolean" }
+      }
+    },
+    "gateDef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "action", "requires", "message"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "enum": ["hard", "soft"] },
+        "action": { "$ref": "#/$defs/actionType" },
+        "requires": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["monitorLeadsAttached", "defibPadsAttached", "hasVascularAccess", "syncEnabled", "pacingModeActive", "pacingRateSet", "pacingCurrentSet", "captureConfirmed"]
+          }
+        },
+        "message": { "type": "string", "minLength": 1 },
+        "penalty": { "type": "number", "minimum": 0 },
+        "onFailureEffect": {
+          "type": "string",
+          "enum": ["none", "worsen_hemodynamics"]
+        }
+      }
+    },
+    "narrativeBeat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "atSeconds", "message", "priority"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "atSeconds": { "type": "number", "minimum": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "priority": { "type": "string", "enum": ["info", "urgent"] },
+        "requiresAcknowledgement": { "type": "boolean" },
+        "condition": {
+          "type": "string",
+          "enum": ["ifNoPads", "ifNoAccess", "ifNoPacingSetup", "ifNoCapture"]
+        }
+      }
+    }
+  }
+}

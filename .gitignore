@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.vscode/
+.idea/
+.netlify/
+.DS_Store
+*.log
