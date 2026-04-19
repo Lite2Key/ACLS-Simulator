@@ -99,16 +99,7 @@ export function App() {
         </div>
       ) : null}
 
-      <main className="grid-layout">
-        <section className="panel panel-narrative">
-          <NarrativePanel
-            now={simState.now}
-            narratives={simState.narratives}
-            pendingAcknowledgement={canAcknowledge}
-            onAcknowledge={() => dispatch('acknowledge_narrative')}
-          />
-        </section>
-
+      <main className="resus-layout">
         <section className="panel panel-monitor">
           <MonitorPanel state={simState} />
         </section>
@@ -121,18 +112,29 @@ export function App() {
           />
         </section>
 
+        <section className="panel panel-narrative">
+          <NarrativePanel
+            now={simState.now}
+            narratives={simState.narratives}
+            pendingAcknowledgement={canAcknowledge}
+            onAcknowledge={() => dispatch('acknowledge_narrative')}
+          />
+        </section>
+
         <section className="panel panel-tasks">
           <TaskQueuePanel now={simState.now} tasks={simState.activeTasks} />
         </section>
       </main>
 
-      <section className="panel panel-debrief" data-testid="debrief-panel">
-        <DebriefPanel
-          debrief={debrief}
-          teachingPoints={DEFAULT_CASE.teachingPoints}
-          outcome={simState.outcome}
-        />
-      </section>
+      {simState.outcome !== 'in_progress' ? (
+        <section className="panel panel-debrief" data-testid="debrief-panel">
+          <DebriefPanel
+            debrief={debrief}
+            teachingPoints={DEFAULT_CASE.teachingPoints}
+            outcome={simState.outcome}
+          />
+        </section>
+      ) : null}
     </div>
   );
 }

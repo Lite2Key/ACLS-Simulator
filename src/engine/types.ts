@@ -8,6 +8,8 @@ export type ActionType =
   | 'start_oxygen'
   | 'establish_iv'
   | 'establish_io'
+  | 'place_arterial_line'
+  | 'attach_capnography'
   | 'give_atropine'
   | 'toggle_sync_on'
   | 'toggle_sync_off'
@@ -37,6 +39,7 @@ export interface SimulationPatientState {
   diastolicBP: number;
   spo2: number;
   rr: number;
+  etco2: number | null;
   rhythm: 'sinus_bradycardia' | 'paced' | 'unstable_tachyarrhythmia';
   hasPulse: boolean;
   mentalStatus: 'alert' | 'verbal' | 'pain' | 'unresponsive';
@@ -51,6 +54,8 @@ export interface SimulationEnvironmentState {
   oxygenOn: boolean;
   ivAccess: boolean;
   ioAccess: boolean;
+  arterialLine: boolean;
+  capnography: boolean;
   pacingModeActive: boolean;
   pacingRate: number | null;
   pacingCurrentMa: number | null;

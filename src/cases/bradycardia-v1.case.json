@@ -21,7 +21,9 @@
     "attachPads": { "guided": 14, "realistic": 21, "instructor": 25 },
     "startOxygen": { "guided": 5, "realistic": 8, "instructor": 10 },
     "establishIV": { "guided": 20, "realistic": 32, "instructor": 40 },
-    "establishIO": { "guided": 16, "realistic": 25, "instructor": 30 }
+    "establishIO": { "guided": 16, "realistic": 25, "instructor": 30 },
+    "placeArterialLine": { "guided": 35, "realistic": 50, "instructor": 60 },
+    "attachCapnography": { "guided": 8, "realistic": 12, "instructor": 15 }
   },
   "initialState": {
     "patient": {
@@ -30,6 +32,7 @@
       "diastolicBP": 48,
       "spo2": 93,
       "rr": 18,
+      "etco2": null,
       "rhythm": "sinus_bradycardia",
       "hasPulse": true,
       "mentalStatus": "verbal",
@@ -43,6 +46,8 @@
       "oxygenOn": false,
       "ivAccess": false,
       "ioAccess": false,
+      "arterialLine": false,
+      "capnography": false,
       "pacingModeActive": false,
       "pacingRate": null,
       "pacingCurrentMa": null,
@@ -102,6 +107,20 @@
       "category": "access",
       "kind": "task",
       "taskTimingKey": "establishIO"
+    },
+    {
+      "id": "place_arterial_line",
+      "label": "Place Arterial Line",
+      "category": "monitoring",
+      "kind": "task",
+      "taskTimingKey": "placeArterialLine"
+    },
+    {
+      "id": "attach_capnography",
+      "label": "Attach EtCO2 Monitoring",
+      "category": "monitoring",
+      "kind": "task",
+      "taskTimingKey": "attachCapnography"
     },
     {
       "id": "give_atropine",

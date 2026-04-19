@@ -7,9 +7,9 @@ describe('App shell', () => {
     render(<App />);
 
     expect(screen.getByText('Narrative and Team Updates')).toBeInTheDocument();
-    expect(screen.getByText('Monitor and Status')).toBeInTheDocument();
+    expect(screen.getByText('ED MONITOR')).toBeInTheDocument();
     expect(screen.getByText('Actions')).toBeInTheDocument();
     expect(screen.getByText('Task Queue')).toBeInTheDocument();
-    expect(screen.getByText('Debrief')).toBeInTheDocument();
+    expect(screen.queryByText('Debrief')).not.toBeInTheDocument();
   });
 });

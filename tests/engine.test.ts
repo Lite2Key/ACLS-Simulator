@@ -73,6 +73,19 @@ describe('simulation engine', () => {
     expect(state.activeTasks).toHaveLength(0);
   });
 
+  it('activates invasive and capnography monitor channels after setup tasks complete', () => {
+    const engine = createSimulationEngine({ caseDef: DEFAULT_CASE, mode: 'realistic' });
+
+    engine.dispatch({ type: 'place_arterial_line' }, 0);
+    engine.dispatch({ type: 'attach_capnography' }, 0);
+    engine.tick(60);
+
+    const state = engine.getState();
+    expect(state.environment.arterialLine).toBe(true);
+    expect(state.environment.capnography).toBe(true);
+    expect(state.patient.etco2).toBe(34);
+  });
+
   it('is deterministic for identical action/time sequences', () => {
     const runA = runDeterministicScenario();
     const runB = runDeterministicScenario();

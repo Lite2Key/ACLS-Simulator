@@ -9,7 +9,9 @@ export type TaskTimingKey =
   | 'attachPads'
   | 'startOxygen'
   | 'establishIV'
-  | 'establishIO';
+  | 'establishIO'
+  | 'placeArterialLine'
+  | 'attachCapnography';
 
 export type ActionCategory =
   | 'assessment'
@@ -79,6 +81,7 @@ export interface CaseDefinitionV2 {
       diastolicBP: number;
       spo2: number;
       rr: number;
+      etco2: number | null;
       rhythm: 'sinus_bradycardia' | 'paced' | 'unstable_tachyarrhythmia';
       hasPulse: boolean;
       mentalStatus: 'alert' | 'verbal' | 'pain' | 'unresponsive';
@@ -92,6 +95,8 @@ export interface CaseDefinitionV2 {
       oxygenOn: boolean;
       ivAccess: boolean;
       ioAccess: boolean;
+      arterialLine: boolean;
+      capnography: boolean;
       pacingModeActive: boolean;
       pacingRate: number | null;
       pacingCurrentMa: number | null;

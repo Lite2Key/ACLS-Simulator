@@ -51,7 +51,17 @@
     "timings": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["transferToBed", "emsHandoff", "attachLeads", "attachPads", "startOxygen", "establishIV", "establishIO"],
+      "required": [
+        "transferToBed",
+        "emsHandoff",
+        "attachLeads",
+        "attachPads",
+        "startOxygen",
+        "establishIV",
+        "establishIO",
+        "placeArterialLine",
+        "attachCapnography"
+      ],
       "properties": {
         "transferToBed": { "$ref": "#/$defs/modeSeconds" },
         "emsHandoff": { "$ref": "#/$defs/modeSeconds" },
@@ -59,7 +69,9 @@
         "attachPads": { "$ref": "#/$defs/modeSeconds" },
         "startOxygen": { "$ref": "#/$defs/modeSeconds" },
         "establishIV": { "$ref": "#/$defs/modeSeconds" },
-        "establishIO": { "$ref": "#/$defs/modeSeconds" }
+        "establishIO": { "$ref": "#/$defs/modeSeconds" },
+        "placeArterialLine": { "$ref": "#/$defs/modeSeconds" },
+        "attachCapnography": { "$ref": "#/$defs/modeSeconds" }
       }
     },
     "initialState": {
@@ -70,13 +82,25 @@
         "patient": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["hr", "systolicBP", "diastolicBP", "spo2", "rr", "rhythm", "hasPulse", "mentalStatus", "statusText"],
+          "required": [
+            "hr",
+            "systolicBP",
+            "diastolicBP",
+            "spo2",
+            "rr",
+            "etco2",
+            "rhythm",
+            "hasPulse",
+            "mentalStatus",
+            "statusText"
+          ],
           "properties": {
             "hr": { "type": "number", "minimum": 0 },
             "systolicBP": { "type": "number", "minimum": 0 },
             "diastolicBP": { "type": "number", "minimum": 0 },
             "spo2": { "type": "number", "minimum": 0, "maximum": 100 },
             "rr": { "type": "number", "minimum": 0 },
+            "etco2": { "type": ["number", "null"], "minimum": 0 },
             "rhythm": {
               "type": "string",
               "enum": ["sinus_bradycardia", "paced", "unstable_tachyarrhythmia"]
@@ -100,6 +124,8 @@
             "oxygenOn",
             "ivAccess",
             "ioAccess",
+            "arterialLine",
+            "capnography",
             "pacingModeActive",
             "pacingRate",
             "pacingCurrentMa",
@@ -114,6 +140,8 @@
             "oxygenOn": { "type": "boolean" },
             "ivAccess": { "type": "boolean" },
             "ioAccess": { "type": "boolean" },
+            "arterialLine": { "type": "boolean" },
+            "capnography": { "type": "boolean" },
             "pacingModeActive": { "type": "boolean" },
             "pacingRate": { "type": ["number", "null"] },
             "pacingCurrentMa": { "type": ["number", "null"] },
@@ -190,6 +218,8 @@
         "start_oxygen",
         "establish_iv",
         "establish_io",
+        "place_arterial_line",
+        "attach_capnography",
         "give_atropine",
         "toggle_sync_on",
         "toggle_sync_off",
@@ -217,7 +247,17 @@
         "kind": { "type": "string", "enum": ["task", "instant"] },
         "taskTimingKey": {
           "type": "string",
-          "enum": ["transferToBed", "emsHandoff", "attachLeads", "attachPads", "startOxygen", "establishIV", "establishIO"]
+          "enum": [
+            "transferToBed",
+            "emsHandoff",
+            "attachLeads",
+            "attachPads",
+            "startOxygen",
+            "establishIV",
+            "establishIO",
+            "placeArterialLine",
+            "attachCapnography"
+          ]
         },
         "description": { "type": "string" },
         "majorBeat": { "type": "boolean" },

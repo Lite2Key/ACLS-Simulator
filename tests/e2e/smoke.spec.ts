@@ -4,15 +4,21 @@ test('vertical slice can be completed to stabilized debrief', async ({ page }) =
   await page.goto('/');
 
   await expect(page.getByText('ACLS Sim v2')).toBeVisible();
+  await expect(page.getByTestId('monitor-panel')).toContainText('ED MONITOR');
 
   await page.getByTestId('action-start_transfer_to_bed').click();
   await page.getByTestId('action-start_ems_handoff').click();
   await page.getByTestId('action-attach_monitor_leads').click();
   await page.getByTestId('action-attach_defib_pads').click();
+  await page.getByTestId('action-place_arterial_line').click();
+  await page.getByTestId('action-attach_capnography').click();
   await page.getByTestId('action-establish_iv').click();
 
   await page.getByTestId('advance-30s').click();
   await page.getByTestId('advance-30s').click();
+
+  await expect(page.getByTestId('wave-a-line')).toContainText('78/48');
+  await expect(page.getByTestId('wave-etco2')).toContainText('34 mmHg');
 
   await page.getByTestId('action-give_atropine').click();
 

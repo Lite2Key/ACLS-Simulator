@@ -38,6 +38,8 @@ const TASK_START_MESSAGES: Record<ActionType, string> = {
   start_oxygen: 'Oxygen setup started.',
   establish_iv: 'IV placement attempt is in progress.',
   establish_io: 'IO placement attempt is in progress.',
+  place_arterial_line: 'Arterial line setup is in progress.',
+  attach_capnography: 'Capnography is being attached.',
   give_atropine: 'Atropine requested.',
   toggle_sync_on: 'Sync mode enabled.',
   toggle_sync_off: 'Sync mode disabled.',
@@ -59,6 +61,8 @@ const TASK_COMPLETE_MESSAGES: Partial<Record<ActionType, string>> = {
   start_oxygen: 'Supplemental oxygen applied.',
   establish_iv: 'IV access established.',
   establish_io: 'IO access established.',
+  place_arterial_line: 'Arterial line waveform is now available.',
+  attach_capnography: 'EtCO2 waveform is now available.',
 };
 
 const TASK_ACTIONS = new Set<ActionType>([
@@ -69,6 +73,8 @@ const TASK_ACTIONS = new Set<ActionType>([
   'start_oxygen',
   'establish_iv',
   'establish_io',
+  'place_arterial_line',
+  'attach_capnography',
 ]);
 
 function cloneInitialState(caseDef: CaseDefinitionV2, mode: SimMode): SimulationState {
@@ -379,6 +385,13 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
         break;
       case 'establish_io':
         state.environment.ioAccess = true;
+        break;
+      case 'place_arterial_line':
+        state.environment.arterialLine = true;
+        break;
+      case 'attach_capnography':
+        state.environment.capnography = true;
+        state.patient.etco2 = state.patient.etco2 ?? 34;
         break;
       case 'start_ems_handoff':
       default:
