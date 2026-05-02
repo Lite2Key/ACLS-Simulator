@@ -1,6 +1,8 @@
 # ED Case Lab Design Language
 
-Primary reference mockup: `docs/design/ed-case-lab-ui-mockup.png`
+Primary simulator reference mockup: `docs/design/ed-case-lab-ui-mockup.png`
+
+Primary home reference mockup: `docs/design/ed-case-lab-home-mockup.png`
 
 Earlier explorations:
 - `docs/design/acls-sim-v2-ui-mockup-v2.png`
@@ -12,7 +14,15 @@ ED Case Lab should feel like a clinical resuscitation cockpit: focused, credible
 
 The monitor is the visual anchor. Everything else should feel like the surrounding command surface: clear, compact, and optimized for quick scanning under pressure.
 
-## Layout Model
+## Home Model
+
+- Default entry screen: Training Hub, not the simulation room.
+- Header: ED Case Lab, Lead the Room, mode selector, and primary Start Case action.
+- Main zone: case library cards with module, difficulty, estimated time, and learning focus.
+- Side zone: selected case readiness and session-local training activity.
+- The home screen should feel like an operational training dashboard, not a marketing landing page.
+
+## Simulation Layout Model
 
 - Top command bar: ED Case Lab identity, case/module selector, mode selector, simulation time, pause, time advance, restart, and compact utility controls.
 - Left primary zone: live ED monitor with waveforms, numeric vitals, and device/readiness status.
@@ -59,4 +69,4 @@ The current app should keep the cockpit structure and broaden it for multiple EM
 - `ActionsPanel`: use a tabbed command-panel layout with critical actions first, icon-led grouped buttons, and gated microcopy.
 - `TaskQueuePanel`: add task progress bars and assigned-role metadata.
 - `NarrativePanel`: tighten timestamps, priority styling, and acknowledgement handling.
-- `App`: keep the cockpit layout shown in the mockup and expose case selection for unstable bradycardia and septic shock.
+- `App`: open to the Training Hub, then launch the mockup-faithful simulator screen for unstable bradycardia or septic shock.

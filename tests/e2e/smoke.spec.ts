@@ -4,17 +4,21 @@ test('vertical slice can be completed to stabilized debrief', async ({ page }) =
   await page.goto('/');
 
   await expect(page.getByText('ED Case Lab')).toBeVisible();
+  await expect(page.getByText('Training Hub')).toBeVisible();
+  await page.getByTestId('start-case').click();
   await expect(page.getByTestId('monitor-panel')).toContainText('ED MONITOR');
 
-  await page.getByRole('tab', { name: 'Team' }).click();
+  await page.getByRole('tab', { name: 'Communicate' }).click();
   await page.getByTestId('action-start_transfer_to_bed').click();
   await page.getByTestId('action-start_ems_handoff').click();
 
-  await page.getByRole('tab', { name: 'Setup' }).click();
+  await page.getByRole('tab', { name: 'Assess' }).click();
   await page.getByTestId('action-attach_monitor_leads').click();
-  await page.getByTestId('action-attach_defib_pads').click();
   await page.getByTestId('action-place_arterial_line').click();
   await page.getByTestId('action-attach_capnography').click();
+
+  await page.getByRole('tab', { name: 'Intervene' }).click();
+  await page.getByTestId('action-attach_defib_pads').click();
   await page.getByTestId('action-establish_iv').click();
 
   await page.getByTestId('advance-30s').click();
@@ -30,7 +34,6 @@ test('vertical slice can be completed to stabilized debrief', async ({ page }) =
     await ackButton.click();
   }
 
-  await page.getByRole('tab', { name: 'Critical' }).click();
   await page.getByTestId('action-start_pacing_mode').click();
   await page.getByTestId('action-set_pacing_rate_70').click();
   await page.getByTestId('action-set_pacing_current_70').click();

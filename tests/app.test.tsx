@@ -9,41 +9,41 @@ describe('App shell', () => {
     document.documentElement.removeAttribute('data-theme');
   });
 
-  it('renders the cockpit workflow in default dark realistic mode', () => {
+  it('opens on the light Training Hub with case cards', () => {
     render(<App />);
 
-    expect(document.documentElement.dataset.theme).toBe('dark');
-    expect(screen.getByText('ED Case Lab')).toBeInTheDocument();
-    expect(screen.getByTestId('mode-select')).toHaveValue('realistic');
-    expect(screen.getByTestId('case-select')).toHaveValue('unstable-bradycardia-v1');
-    expect(screen.getByText('ED MONITOR')).toBeInTheDocument();
-    expect(screen.getByText('Active Workflow')).toBeInTheDocument();
-    expect(screen.getByText('Command')).toBeInTheDocument();
-    expect(screen.getByText('Team Updates')).toBeInTheDocument();
-    expect(screen.getByTestId('action-start_pacing_mode')).toBeInTheDocument();
-    expect(screen.getAllByText('needs pads').length).toBeGreaterThan(0);
-    expect(screen.queryByText('Debrief')).not.toBeInTheDocument();
+    expect(document.documentElement.dataset.theme).toBe('light');
+    expect(screen.getByText('Training Hub')).toBeInTheDocument();
+    expect(screen.getByText('Lead the Room')).toBeInTheDocument();
+    expect(screen.getByTestId('case-card-unstable-bradycardia-v1')).toBeInTheDocument();
+    expect(screen.getByTestId('case-card-septic-shock-v1')).toBeInTheDocument();
+    expect(screen.getByTestId('start-case')).toBeInTheDocument();
   });
 
-  it('switches from the bradycardia flagship to the septic shock case', async () => {
+  it('selects septic shock from the Training Hub and launches the simulator', async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.selectOptions(screen.getByTestId('case-select'), 'septic-shock-v1');
+    await user.click(screen.getByTestId('case-card-septic-shock-v1'));
+    await user.click(screen.getByTestId('home-mode-instructor'));
+    await user.click(screen.getByTestId('start-case'));
 
-    expect(screen.getByText('Septic Shock: Early Resuscitation and Reassessment')).toBeInTheDocument();
-    expect(screen.getAllByText('General EM Resuscitation').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('mode-select')).toHaveValue('instructor');
+    expect(screen.getByText('Septic Shock')).toBeInTheDocument();
+    expect(screen.getByTestId('monitor-panel')).toHaveTextContent('ED MONITOR');
+    await user.click(screen.getByRole('tab', { name: 'Intervene' }));
     expect(screen.getByTestId('action-give_fluid_bolus')).toBeInTheDocument();
     expect(screen.getByTestId('action-start_norepinephrine')).toBeInTheDocument();
   });
 
-  it('toggles and persists the theme choice', async () => {
+  it('returns from the simulator to the case library', async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByTestId('theme-toggle'));
+    await user.click(screen.getByTestId('start-case'));
+    await user.click(screen.getByTestId('back-library'));
 
-    expect(document.documentElement.dataset.theme).toBe('light');
-    expect(window.localStorage.getItem('acls-sim-theme')).toBe('light');
+    expect(screen.getByText('Case Library')).toBeInTheDocument();
+    expect(screen.getByTestId('case-card-unstable-bradycardia-v1')).toBeInTheDocument();
   });
 });

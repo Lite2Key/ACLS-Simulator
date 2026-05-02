@@ -20,7 +20,7 @@ import type { ActionType, SimulationState } from '../engine';
 import type { SimulationEnvironmentState } from '../engine/types';
 import type { ActionCategory, CaseActionDefinition, GateRule, RequirementKey } from '../types/case';
 
-type CommandTab = 'critical' | 'setup' | 'airway' | 'meds' | 'electrical' | 'team';
+type CommandTab = 'assess' | 'intervene' | 'communicate' | 'other';
 
 interface ActionsPanelProps {
   actions: CaseActionDefinition[];
@@ -32,20 +32,17 @@ interface ActionsPanelProps {
 }
 
 const TABS: Array<{ id: CommandTab; label: string }> = [
-  { id: 'critical', label: 'Critical' },
-  { id: 'setup', label: 'Setup' },
-  { id: 'airway', label: 'Airway' },
-  { id: 'meds', label: 'Meds' },
-  { id: 'electrical', label: 'Electrical' },
-  { id: 'team', label: 'Team' },
+  { id: 'assess', label: 'Assess' },
+  { id: 'intervene', label: 'Intervene' },
+  { id: 'communicate', label: 'Communicate' },
+  { id: 'other', label: 'Other' },
 ];
 
-const TAB_CATEGORIES: Record<Exclude<CommandTab, 'critical'>, ActionCategory[]> = {
-  setup: ['assessment', 'monitoring', 'access', 'labs', 'source'],
-  airway: ['airway'],
-  meds: ['medication', 'resuscitation'],
-  electrical: ['electrical'],
-  team: ['communication'],
+const TAB_CATEGORIES: Record<CommandTab, ActionCategory[]> = {
+  assess: ['assessment', 'monitoring', 'labs'],
+  intervene: ['access', 'airway', 'medication', 'resuscitation', 'electrical', 'source'],
+  communicate: ['communication'],
+  other: [],
 };
 
 const ACTION_ICON: Partial<Record<ActionType, typeof Zap>> = {
@@ -183,21 +180,24 @@ function shortLabel(label: string): string {
 }
 
 function actionMatchesTab(action: CaseActionDefinition, activeTab: CommandTab): boolean {
-  if (activeTab === 'critical') {
-    return Boolean(action.majorBeat);
+  if (activeTab === 'other') {
+    return !TABS.filter((tab) => tab.id !== 'other').some((tab) => TAB_CATEGORIES[tab.id].includes(action.category));
   }
 
   return TAB_CATEGORIES[activeTab].includes(action.category);
 }
 
 export function ActionsPanel({ actions, gates, state, outcome, moduleLabel, onAction }: ActionsPanelProps) {
-  const [activeTab, setActiveTab] = useState<CommandTab>('critical');
+  const [activeTab, setActiveTab] = useState<CommandTab>('assess');
   const visibleActions = useMemo(() => actions.filter((action) => !action.hidden), [actions]);
 
-  const tabActions = visibleActions.filter((action) => actionMatchesTab(action, activeTab));
-  const secondaryActions = activeTab === 'critical'
-    ? visibleActions.filter((action) => !action.majorBeat).slice(0, 6)
-    : visibleActions.filter((action) => action.majorBeat && !tabActions.some((item) => item.id === action.id)).slice(0, 4);
+  const tabActions = visibleActions
+    .filter((action) => actionMatchesTab(action, activeTab))
+    .sort((a, b) => Number(Boolean(b.majorBeat)) - Number(Boolean(a.majorBeat)));
+
+  const priorityActions = visibleActions
+    .filter((action) => action.majorBeat && !tabActions.some((item) => item.id === action.id))
+    .slice(0, 3);
 
   function renderAction(action: CaseActionDefinition, compact = false) {
     const Icon = ACTION_ICON[action.id] ?? ClipboardList;
@@ -239,7 +239,7 @@ export function ActionsPanel({ actions, gates, state, outcome, moduleLabel, onAc
       <div className="panel-header-row">
         <div>
           <h2>Command</h2>
-          <p className="panel-subtitle">Case actions by workflow priority</p>
+          <p className="panel-subtitle">Assess, intervene, and communicate</p>
         </div>
         <span className="chip">{moduleLabel}</span>
       </div>
@@ -262,12 +262,12 @@ export function ActionsPanel({ actions, gates, state, outcome, moduleLabel, onAc
       <div className="actions-groups" data-testid="actions-panel">
         <div className="critical-action-grid">{tabActions.map((action) => renderAction(action))}</div>
 
-        {secondaryActions.length > 0 ? (
+        {priorityActions.length > 0 ? (
           <section className="secondary-actions">
             <div className="section-label">
-              <span>Other actions</span>
+              <span>Priority elsewhere</span>
             </div>
-            <div className="secondary-action-grid">{secondaryActions.map((action) => renderAction(action, true))}</div>
+            <div className="secondary-action-grid">{priorityActions.map((action) => renderAction(action, true))}</div>
           </section>
         ) : null}
 
