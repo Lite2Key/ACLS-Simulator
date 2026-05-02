@@ -10,6 +10,7 @@ import type {
   UserAction,
 } from './types';
 import type {
+  ActionEffect,
   CaseActionDefinition,
   CaseDefinitionV2,
   NarrativeBeat,
@@ -23,59 +24,6 @@ interface GateEvaluationResult {
   softPenaltyTotal: number;
   softMessages: string[];
 }
-
-type NullableMetricKey =
-  | 'timeToMonitor'
-  | 'timeToPads'
-  | 'timeToPacingInitiation'
-  | 'timeToCapture';
-
-const TASK_START_MESSAGES: Record<ActionType, string> = {
-  start_transfer_to_bed: 'Team starts transferring the patient from stretcher to bed.',
-  start_ems_handoff: 'EMS handoff starts. Team receives prehospital details.',
-  attach_monitor_leads: 'Monitor leads are being attached.',
-  attach_defib_pads: 'Defibrillator pads are being applied.',
-  start_oxygen: 'Oxygen setup started.',
-  establish_iv: 'IV placement attempt is in progress.',
-  establish_io: 'IO placement attempt is in progress.',
-  place_arterial_line: 'Arterial line setup is in progress.',
-  attach_capnography: 'Capnography is being attached.',
-  give_atropine: 'Atropine requested.',
-  toggle_sync_on: 'Sync mode enabled.',
-  toggle_sync_off: 'Sync mode disabled.',
-  set_cardioversion_energy_100: 'Cardioversion energy set to 100J.',
-  deliver_cardioversion: 'Cardioversion delivered.',
-  start_pacing_mode: 'Pacing mode enabled.',
-  set_pacing_rate_70: 'Pacing rate set to 70 bpm.',
-  set_pacing_current_40: 'Pacing current set to 40 mA.',
-  set_pacing_current_70: 'Pacing current set to 70 mA.',
-  confirm_capture: 'Capture check requested.',
-  acknowledge_narrative: 'Narrative acknowledged.',
-};
-
-const TASK_COMPLETE_MESSAGES: Partial<Record<ActionType, string>> = {
-  start_transfer_to_bed: 'Patient transferred to ED bed.',
-  start_ems_handoff: 'EMS handoff complete: new beta-blocker started one week ago.',
-  attach_monitor_leads: 'Leads attached. Rhythm visible as sinus bradycardia.',
-  attach_defib_pads: 'Pads attached. Electrical therapy is now available.',
-  start_oxygen: 'Supplemental oxygen applied.',
-  establish_iv: 'IV access established.',
-  establish_io: 'IO access established.',
-  place_arterial_line: 'Arterial line waveform is now available.',
-  attach_capnography: 'EtCO2 waveform is now available.',
-};
-
-const TASK_ACTIONS = new Set<ActionType>([
-  'start_transfer_to_bed',
-  'start_ems_handoff',
-  'attach_monitor_leads',
-  'attach_defib_pads',
-  'start_oxygen',
-  'establish_iv',
-  'establish_io',
-  'place_arterial_line',
-  'attach_capnography',
-]);
 
 function cloneInitialState(caseDef: CaseDefinitionV2, mode: SimMode): SimulationState {
   return {
@@ -95,6 +43,13 @@ function cloneInitialState(caseDef: CaseDefinitionV2, mode: SimMode): Simulation
 }
 
 function createDebrief(caseDef: CaseDefinitionV2, mode: SimMode): DebriefReport {
+  const metrics = Object.fromEntries(
+    Object.keys(caseDef.debriefRules.metricLabels).map((metricKey) => [
+      metricKey,
+      metricKey === 'algorithmDeviationCount' ? 0 : null,
+    ]),
+  );
+
   return {
     caseId: caseDef.metadata.id,
     mode,
@@ -102,13 +57,8 @@ function createDebrief(caseDef: CaseDefinitionV2, mode: SimMode): DebriefReport 
     timeline: [],
     criticalMisses: [],
     goodDecisions: [],
-    metrics: {
-      timeToMonitor: null,
-      timeToPads: null,
-      timeToPacingInitiation: null,
-      timeToCapture: null,
-      algorithmDeviationCount: 0,
-    },
+    metrics,
+    metricLabels: { ...caseDef.debriefRules.metricLabels },
   };
 }
 
@@ -120,7 +70,6 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
   const debrief = createDebrief(caseDef, mode);
   const completedActions = new Set<ActionType>();
   const firedNarrativeBeats = new Set<string>();
-
   const state = cloneInitialState(caseDef, mode);
   let eventSequence = 0;
   let taskSequence = 0;
@@ -216,6 +165,16 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
         return state.environment.pacingCurrentMa !== null;
       case 'captureConfirmed':
         return state.environment.captureConfirmed;
+      case 'bloodCulturesDrawn':
+        return Boolean(state.environment.bloodCulturesDrawn);
+      case 'lactateSent':
+        return Boolean(state.environment.lactateSent);
+      case 'fluidsStarted':
+        return Boolean(state.environment.fluidsStarted);
+      case 'antibioticsGiven':
+        return Boolean(state.environment.antibioticsGiven);
+      case 'vasopressorStarted':
+        return Boolean(state.environment.vasopressorStarted);
       default:
         return false;
     }
@@ -227,13 +186,17 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
     }
   }
 
+  function incrementAlgorithmDeviation(): void {
+    debrief.metrics.algorithmDeviationCount = (debrief.metrics.algorithmDeviationCount ?? 0) + 1;
+  }
+
   function applyPenalty(at: number, amount: number, message: string, action: ActionType): void {
     if (amount <= 0) {
       return;
     }
 
     state.penalties += amount;
-    debrief.metrics.algorithmDeviationCount += 1;
+    incrementAlgorithmDeviation();
 
     addTimelineEntry({
       at,
@@ -246,9 +209,11 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
   function worsenHemodynamics(): void {
     state.patient.systolicBP = Math.max(48, state.patient.systolicBP - 8);
     state.patient.diastolicBP = Math.max(24, state.patient.diastolicBP - 5);
-    state.patient.hr = Math.max(20, state.patient.hr - 2);
+    state.patient.hr = state.patient.rhythm === 'sinus_tachycardia'
+      ? Math.min(160, state.patient.hr + 8)
+      : Math.max(20, state.patient.hr - 2);
     state.patient.mentalStatus = state.patient.systolicBP < 70 ? 'pain' : 'verbal';
-    state.patient.statusText = 'Hemodynamics worsen after unsafe intervention.';
+    state.patient.statusText = 'Hemodynamics worsen after unsafe or delayed intervention.';
   }
 
   function evaluateGates(actionType: ActionType, now: number): GateEvaluationResult {
@@ -296,18 +261,29 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
     };
   }
 
-  function setMetricIfEmpty(metric: NullableMetricKey, value: number): void {
+  function setMetricIfEmpty(metric: string | undefined, value: number): void {
+    if (!metric) {
+      return;
+    }
+
+    if (!(metric in debrief.metrics)) {
+      debrief.metrics[metric] = null;
+      debrief.metricLabels[metric] = metric;
+    }
+
     if (debrief.metrics[metric] === null) {
       debrief.metrics[metric] = value;
     }
   }
 
   function maybeRecordGoodDecision(actionType: ActionType): void {
-    if (
-      caseDef.debriefRules.goodDecisionActions.includes(actionType) &&
-      !debrief.goodDecisions.includes(actionType)
-    ) {
-      debrief.goodDecisions.push(actionType);
+    if (!caseDef.debriefRules.goodDecisionActions.includes(actionType)) {
+      return;
+    }
+
+    const label = getActionDefinition(actionType)?.label ?? actionType;
+    if (!debrief.goodDecisions.includes(label)) {
+      debrief.goodDecisions.push(label);
     }
   }
 
@@ -328,7 +304,15 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
       };
     }
 
-    const baseDuration = caseDef.timings[actionDef.taskTimingKey][mode];
+    const timing = caseDef.timings[actionDef.taskTimingKey];
+    if (!timing) {
+      return {
+        status: 'hard_blocked',
+        message: `Task timing missing for ${actionDef.taskTimingKey}.`,
+      };
+    }
+
+    const baseDuration = timing[mode];
     const duration = Math.max(1, Math.round(baseDuration * modeConfig.timingMultiplier));
     const taskId = nextTaskId(actionDef.id);
 
@@ -350,7 +334,7 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
     addTimelineEntry({
       at: now,
       type: 'action',
-      message: TASK_START_MESSAGES[actionDef.id],
+      message: `${actionDef.label} started.`,
       action: actionDef.id,
     });
 
@@ -361,61 +345,71 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
     };
   }
 
-  function processTaskCompletion(actionType: ActionType, at: number): void {
-    state.activeTasks = state.activeTasks.filter((task) => task.action !== actionType);
-
-    switch (actionType) {
-      case 'start_transfer_to_bed':
+  function applyCompletionEffect(effect: ActionEffect | undefined, actionDef: CaseActionDefinition, at: number): void {
+    switch (effect) {
+      case 'transfer_to_bed_complete':
         state.environment.onBed = true;
         break;
-      case 'attach_monitor_leads':
+      case 'ems_handoff_complete':
+        addNarrative(at, 'EMS: Recent details added to the working problem representation.', 'info', false);
+        break;
+      case 'attach_monitor_leads_complete':
         state.environment.monitorLeadsAttached = true;
-        setMetricIfEmpty('timeToMonitor', at);
         break;
-      case 'attach_defib_pads':
+      case 'attach_defib_pads_complete':
         state.environment.defibPadsAttached = true;
-        setMetricIfEmpty('timeToPads', at);
+        addNarrative(at, 'Pads are on. Electrical therapy hardware is ready.', 'info', false);
         break;
-      case 'start_oxygen':
+      case 'start_oxygen_complete':
         state.environment.oxygenOn = true;
         state.patient.spo2 = Math.min(99, state.patient.spo2 + 3);
         break;
-      case 'establish_iv':
+      case 'establish_iv_complete':
         state.environment.ivAccess = true;
         break;
-      case 'establish_io':
+      case 'establish_io_complete':
         state.environment.ioAccess = true;
         break;
-      case 'place_arterial_line':
+      case 'place_arterial_line_complete':
         state.environment.arterialLine = true;
         break;
-      case 'attach_capnography':
+      case 'attach_capnography_complete':
         state.environment.capnography = true;
         state.patient.etco2 = state.patient.etco2 ?? 34;
         break;
-      case 'start_ems_handoff':
+      case 'send_lactate_complete':
+        state.environment.lactateSent = true;
+        state.patient.lactate = state.patient.lactate ?? 5.4;
+        addNarrative(at, 'Lab: Lactate returns elevated at 5.4 mmol/L.', 'urgent', false);
+        break;
+      case 'draw_blood_cultures_complete':
+        state.environment.bloodCulturesDrawn = true;
+        break;
       default:
         break;
     }
 
+    setMetricIfEmpty(actionDef.metricKey, at);
+  }
+
+  function processTaskCompletion(actionType: ActionType, at: number): void {
+    const actionDef = getActionDefinition(actionType);
+    state.activeTasks = state.activeTasks.filter((task) => task.action !== actionType);
+
+    if (!actionDef) {
+      return;
+    }
+
+    applyCompletionEffect(actionDef.completionEffect ?? actionDef.effect, actionDef, at);
     completedActions.add(actionType);
     maybeRecordGoodDecision(actionType);
 
-    const completionMessage = TASK_COMPLETE_MESSAGES[actionType] ?? `${actionType} completed.`;
     addTimelineEntry({
       at,
       type: 'result',
-      message: completionMessage,
+      message: `${actionDef.label} complete.`,
       action: actionType,
     });
-
-    if (actionType === 'start_ems_handoff') {
-      addNarrative(at, 'EMS: New metoprolol started one week ago.', 'info', false);
-    }
-
-    if (actionType === 'attach_defib_pads') {
-      addNarrative(at, 'Pads are on. Pacing and cardioversion hardware is ready.', 'info', false);
-    }
 
     maybeFinalizeOutcome(at);
   }
@@ -434,6 +428,14 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
         );
       case 'ifNoCapture':
         return !state.environment.captureConfirmed;
+      case 'ifNoFluids':
+        return !state.environment.fluidsStarted;
+      case 'ifNoAntibiotics':
+        return !state.environment.antibioticsGiven;
+      case 'ifNoVasopressor':
+        return state.patient.systolicBP < 90 && !state.environment.vasopressorStarted;
+      case 'ifShockUnresolved':
+        return state.patient.systolicBP < 90 || state.patient.mentalStatus !== 'alert';
       default:
         return true;
     }
@@ -446,11 +448,11 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
 
     state.outcome = 'deteriorated';
     debrief.outcome = 'deteriorated';
-    state.patient.hr = 22;
-    state.patient.systolicBP = 58;
-    state.patient.diastolicBP = 30;
+    state.patient.systolicBP = Math.max(48, state.patient.systolicBP - 20);
+    state.patient.diastolicBP = Math.max(24, state.patient.diastolicBP - 10);
+    state.patient.hr = state.patient.rhythm === 'sinus_tachycardia' ? 148 : 22;
     state.patient.mentalStatus = 'unresponsive';
-    state.patient.statusText = 'Patient has deteriorated toward peri-arrest state.';
+    state.patient.statusText = 'Patient has deteriorated toward peri-arrest physiology.';
 
     addTimelineEntry({
       at: now,
@@ -461,13 +463,29 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
     addNarrative(now, 'Team: Hemodynamics are collapsing. Immediate escalation needed.', 'urgent', true);
   }
 
+  function bradycardiaStabilized(): boolean {
+    return state.environment.captureConfirmed && state.patient.rhythm === 'paced' && state.patient.systolicBP >= 90;
+  }
+
+  function septicShockStabilized(): boolean {
+    return Boolean(
+      state.environment.fluidsStarted &&
+        (state.environment.fluidBolusMl ?? 0) >= 2000 &&
+        state.environment.antibioticsGiven &&
+        state.environment.vasopressorStarted &&
+        state.environment.perfusionReassessed &&
+        state.patient.systolicBP >= 90,
+    );
+  }
+
   function maybeFinalizeOutcome(now: number): void {
     if (state.outcome !== 'in_progress') {
       return;
     }
 
-    const stabilized =
-      state.environment.captureConfirmed && state.patient.rhythm === 'paced' && state.patient.systolicBP >= 90;
+    const stabilized = caseDef.metadata.id.includes('septic-shock')
+      ? septicShockStabilized()
+      : bradycardiaStabilized();
 
     if (stabilized) {
       state.outcome = 'stabilized';
@@ -476,7 +494,9 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
       addTimelineEntry({
         at: now,
         type: 'result',
-        message: 'Patient stabilized with confirmed mechanical capture.',
+        message: caseDef.metadata.id.includes('septic-shock')
+          ? 'Shock physiology is improving after fluids, antibiotics, vasopressor support, and reassessment.'
+          : 'Patient stabilized with confirmed mechanical capture.',
       });
 
       return;
@@ -487,82 +507,126 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
     }
   }
 
-  function applyInstantAction(actionType: ActionType, now: number): ActionOutcome {
-    switch (actionType) {
-      case 'give_atropine': {
-        atropineDoseCount += 1;
-        completedActions.add(actionType);
-        maybeRecordGoodDecision(actionType);
+  function applyAtropine(now: number, actionType: ActionType): ActionOutcome {
+    atropineDoseCount += 1;
 
-        if (atropineDoseCount === 1) {
-          state.patient.hr = 42;
-          state.patient.systolicBP = 82;
-          state.patient.diastolicBP = 52;
-          state.patient.statusText = 'Minimal response to atropine. Patient remains unstable.';
+    if (atropineDoseCount === 1) {
+      state.patient.hr = 42;
+      state.patient.systolicBP = 82;
+      state.patient.diastolicBP = 52;
+      state.patient.statusText = 'Minimal response to atropine. Patient remains unstable.';
 
-          addNarrative(
-            now,
-            'Nurse: Slight heart rate bump, but BP is still low. We should prepare to pace.',
-            'urgent',
-            true,
-          );
-        } else {
-          state.patient.hr = Math.min(46, state.patient.hr + 2);
-          state.patient.statusText = 'Additional atropine gives limited benefit. Escalation still required.';
+      addNarrative(
+        now,
+        'Nurse: Slight heart rate bump, but BP is still low. We should prepare to pace.',
+        'urgent',
+        true,
+      );
+    } else {
+      state.patient.hr = Math.min(46, state.patient.hr + 2);
+      state.patient.statusText = 'Additional atropine gives limited benefit. Escalation still required.';
 
-          addNarrative(now, 'Nurse: Repeat atropine had limited effect. Pacing remains priority.', 'info', false);
-        }
+      addNarrative(now, 'Nurse: Repeat atropine had limited effect. Pacing remains priority.', 'info', false);
+    }
 
-        addTimelineEntry({
-          at: now,
-          type: 'action',
-          message: 'Atropine administered.',
-          action: actionType,
-        });
+    addTimelineEntry({
+      at: now,
+      type: 'action',
+      message: 'Atropine administered.',
+      action: actionType,
+    });
 
-        return {
-          status: 'state_changed',
-          message: 'Atropine administered. Minimal hemodynamic improvement.',
-        };
+    return {
+      status: 'state_changed',
+      message: 'Atropine administered. Minimal hemodynamic improvement.',
+    };
+  }
+
+  function applySepsisEffect(effect: ActionEffect, now: number, actionType: ActionType): ActionOutcome {
+    switch (effect) {
+      case 'give_fluid_bolus': {
+        state.environment.fluidsStarted = true;
+        state.environment.fluidBolusMl = (state.environment.fluidBolusMl ?? 0) + 1000;
+        state.patient.systolicBP = Math.min(92, state.patient.systolicBP + 12);
+        state.patient.diastolicBP = Math.min(56, state.patient.diastolicBP + 6);
+        state.patient.hr = Math.max(112, state.patient.hr - 8);
+        state.patient.statusText = `${state.environment.fluidBolusMl} mL crystalloid in. Perfusion is only partially improved.`;
+        addNarrative(now, 'RN: Pressure is a little better after the bolus, but still marginal.', 'info', false);
+        addTimelineEntry({ at: now, type: 'action', message: 'Crystalloid bolus started.', action: actionType });
+        return { status: 'state_changed', message: 'Fluid bolus started. Reassess perfusion and pressure.' };
       }
 
-      case 'toggle_sync_on':
+      case 'give_antibiotics':
+        state.environment.antibioticsGiven = true;
+        state.patient.temperatureC = state.patient.temperatureC ? Math.max(38.3, state.patient.temperatureC - 0.2) : undefined;
+        state.patient.statusText = 'Broad-spectrum antibiotics are running; shock physiology still needs reassessment.';
+        addTimelineEntry({ at: now, type: 'action', message: 'Broad-spectrum antibiotics started.', action: actionType });
+        return { status: 'state_changed', message: 'Antibiotics started.' };
+
+      case 'start_norepinephrine':
+        state.environment.vasopressorStarted = true;
+        state.patient.systolicBP = Math.max(96, state.patient.systolicBP + 18);
+        state.patient.diastolicBP = Math.max(58, state.patient.diastolicBP + 10);
+        state.patient.hr = Math.max(104, state.patient.hr - 6);
+        state.patient.mentalStatus = 'verbal';
+        state.patient.statusText = 'Norepinephrine is improving MAP while definitive care continues.';
+        addNarrative(now, 'RN: Norepinephrine is running peripherally while central access is prepared.', 'info', false);
+        addTimelineEntry({ at: now, type: 'action', message: 'Norepinephrine started.', action: actionType });
+        return { status: 'state_changed', message: 'Norepinephrine started. MAP improving.' };
+
+      case 'reassess_perfusion':
+        state.environment.perfusionReassessed = true;
+        state.patient.mentalStatus = state.patient.systolicBP >= 90 ? 'alert' : 'verbal';
+        state.patient.statusText = state.patient.systolicBP >= 90
+          ? 'Perfusion reassessment shows improving mentation and pressure.'
+          : 'Perfusion reassessment shows persistent shock.';
+        addTimelineEntry({ at: now, type: 'result', message: 'Perfusion reassessed.', action: actionType });
+        maybeFinalizeOutcome(now);
+        return { status: 'state_changed', message: 'Perfusion reassessed.' };
+
+      case 'call_icu':
+        state.environment.icuCalled = true;
+        addNarrative(now, 'ICU: We are preparing a bed; keep resuscitation moving.', 'info', false);
+        addTimelineEntry({ at: now, type: 'action', message: 'ICU consulted for septic shock admission.', action: actionType });
+        return { status: 'state_changed', message: 'ICU consulted.' };
+
+      default:
+        return { status: 'accepted', message: 'Action accepted.' };
+    }
+  }
+
+  function applyInstantAction(actionDef: CaseActionDefinition, now: number): ActionOutcome {
+    const actionType = actionDef.id;
+    const effect = actionDef.effect;
+    setMetricIfEmpty(actionDef.metricKey, now);
+
+    switch (effect) {
+      case 'give_atropine':
+        return applyAtropine(now, actionType);
+
+      case 'enable_sync':
         state.environment.syncEnabled = true;
         addTimelineEntry({ at: now, type: 'action', message: 'Sync mode enabled.', action: actionType });
         return { status: 'state_changed', message: 'Sync mode enabled.' };
 
-      case 'toggle_sync_off':
+      case 'disable_sync':
         state.environment.syncEnabled = false;
         addTimelineEntry({ at: now, type: 'action', message: 'Sync mode disabled.', action: actionType });
         return { status: 'state_changed', message: 'Sync mode disabled.' };
 
       case 'set_cardioversion_energy_100':
         state.environment.cardioversionEnergyJ = 100;
-        addTimelineEntry({
-          at: now,
-          type: 'action',
-          message: 'Cardioversion energy set to 100J.',
-          action: actionType,
-        });
+        addTimelineEntry({ at: now, type: 'action', message: 'Cardioversion energy set to 100J.', action: actionType });
         return { status: 'state_changed', message: 'Energy set to 100J.' };
 
       case 'deliver_cardioversion':
-        completedActions.add(actionType);
         state.patient.hr = Math.max(24, state.patient.hr - 5);
         state.patient.systolicBP = Math.max(52, state.patient.systolicBP - 10);
         state.patient.diastolicBP = Math.max(28, state.patient.diastolicBP - 6);
         state.patient.mentalStatus = 'pain';
         state.patient.statusText = 'Cardioversion was inappropriate for this bradycardia scenario.';
-
-        addTimelineEntry({
-          at: now,
-          type: 'warning',
-          message: 'Cardioversion delivered in bradycardia with pulse.',
-          action: actionType,
-        });
-
+        addTimelineEntry({ at: now, type: 'warning', message: 'Cardioversion delivered in bradycardia with pulse.', action: actionType });
         addNarrative(now, 'Team: This rhythm needed pacing support, not cardioversion.', 'urgent', false);
-
         return {
           status: 'accepted_with_penalty',
           message: 'Cardioversion was inappropriate and worsened hemodynamics.',
@@ -571,28 +635,18 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
 
       case 'start_pacing_mode':
         state.environment.pacingModeActive = true;
-        setMetricIfEmpty('timeToPacingInitiation', now);
-        completedActions.add(actionType);
-        maybeRecordGoodDecision(actionType);
-
         addTimelineEntry({ at: now, type: 'action', message: 'Pacing mode activated.', action: actionType });
         return { status: 'state_changed', message: 'Pacing mode active. Set rate and current.' };
 
       case 'set_pacing_rate_70':
         state.environment.pacingRate = 70;
-        completedActions.add(actionType);
-        maybeRecordGoodDecision(actionType);
-
         addTimelineEntry({ at: now, type: 'action', message: 'Pacing rate set to 70 bpm.', action: actionType });
         return { status: 'state_changed', message: 'Pacing rate configured at 70 bpm.' };
 
       case 'set_pacing_current_40':
         state.environment.pacingCurrentMa = 40;
-        completedActions.add(actionType);
-
         addTimelineEntry({ at: now, type: 'warning', message: 'Current set to 40 mA. Capture unlikely.', action: actionType });
         applyPenalty(now, 3, 'Pacing current too low for likely capture in this patient.', actionType);
-
         return {
           status: 'accepted_with_penalty',
           message: '40 mA selected. Capture may fail.',
@@ -601,9 +655,6 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
 
       case 'set_pacing_current_70':
         state.environment.pacingCurrentMa = 70;
-        completedActions.add(actionType);
-        maybeRecordGoodDecision(actionType);
-
         addTimelineEntry({ at: now, type: 'action', message: 'Pacing current set to 70 mA.', action: actionType });
         return { status: 'state_changed', message: 'Pacing current configured at 70 mA.' };
 
@@ -628,32 +679,22 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
         state.patient.diastolicBP = 62;
         state.patient.mentalStatus = 'alert';
         state.patient.statusText = 'Pacing capture confirmed. Perfusion improves and symptoms ease.';
-
-        setMetricIfEmpty('timeToCapture', now);
-        completedActions.add(actionType);
-        maybeRecordGoodDecision(actionType);
-
-        addTimelineEntry({
-          at: now,
-          type: 'result',
-          message: 'Mechanical capture confirmed with pacing at 70/70.',
-          action: actionType,
-        });
-
-        addNarrative(now, 'Nurse: Strong pulse now. Blood pressure is recovering. Great capture.', 'info', true);
+        addTimelineEntry({ at: now, type: 'result', message: 'Mechanical capture confirmed with pacing at 70/70.', action: actionType });
+        addNarrative(now, 'Nurse: Strong pulse now. Blood pressure is recovering. Capture confirmed.', 'info', true);
         maybeFinalizeOutcome(now);
-
-        return {
-          status: 'state_changed',
-          message: 'Mechanical capture confirmed. Patient stabilizing.',
-        };
+        return { status: 'state_changed', message: 'Mechanical capture confirmed. Patient stabilizing.' };
       }
 
+      case 'give_fluid_bolus':
+      case 'give_antibiotics':
+      case 'start_norepinephrine':
+      case 'reassess_perfusion':
+      case 'call_icu':
+        return applySepsisEffect(effect, now, actionType);
+
       default:
-        return {
-          status: 'accepted',
-          message: TASK_START_MESSAGES[actionType] ?? 'Action accepted.',
-        };
+        addTimelineEntry({ at: now, type: 'action', message: `${actionDef.label} completed.`, action: actionType });
+        return { status: 'accepted', message: `${actionDef.label} completed.` };
     }
   }
 
@@ -696,17 +737,14 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
         addNarrative(event.at, beat.message, beat.priority, Boolean(beat.requiresAcknowledgement));
         autoHintCount += 1;
         firedNarrativeBeats.add(beat.id);
-
         break;
       }
 
-      case 'deterioration_check': {
+      case 'deterioration_check':
         if (state.outcome === 'in_progress') {
           triggerDeterioration(event.at, 'Case time limit reached before stabilization.');
         }
-
         break;
-      }
 
       default:
         break;
@@ -722,7 +760,7 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
       }
     }
 
-    if (!completedActions.has('establish_iv') && !completedActions.has('establish_io')) {
+    if (caseDef.gates.some((gate) => gate.requires.includes('hasVascularAccess')) && !hasVascularAccess()) {
       markCriticalMiss('No vascular access was established.');
     }
   }
@@ -737,13 +775,7 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
     }
 
     state.pendingAcknowledgementId = null;
-
-    addTimelineEntry({
-      at: now,
-      type: 'action',
-      message: 'Narrative acknowledged.',
-      action: 'acknowledge_narrative',
-    });
+    addTimelineEntry({ at: now, type: 'action', message: 'Narrative acknowledged.', action: 'acknowledge_narrative' });
 
     return {
       status: 'accepted',
@@ -804,12 +836,11 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
       };
     }
 
-    let outcome: ActionOutcome;
-    if (TASK_ACTIONS.has(action.type)) {
-      outcome = startTask(actionDef, now);
-    } else {
-      outcome = applyInstantAction(action.type, now);
+    let outcome = actionDef.kind === 'task' ? startTask(actionDef, now) : applyInstantAction(actionDef, now);
+
+    if (outcome.status !== 'hard_blocked') {
       completedActions.add(action.type);
+      maybeRecordGoodDecision(action.type);
     }
 
     if (gateResult.softMessages.length > 0) {
@@ -817,12 +848,7 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
         markCriticalMiss(softMessage);
       }
 
-      applyPenalty(
-        now,
-        gateResult.softPenaltyTotal,
-        gateResult.softMessages.join(' | '),
-        action.type,
-      );
+      applyPenalty(now, gateResult.softPenaltyTotal, gateResult.softMessages.join(' | '), action.type);
     }
 
     if (gateResult.softPenaltyTotal > 0 && outcome.status !== 'hard_blocked') {
@@ -834,7 +860,6 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
     }
 
     maybeFinalizeOutcome(now);
-
     return outcome;
   }
 
@@ -864,6 +889,7 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
       criticalMisses: [...debrief.criticalMisses],
       goodDecisions: [...debrief.goodDecisions],
       metrics: { ...debrief.metrics },
+      metricLabels: { ...debrief.metricLabels },
     };
   }
 
@@ -874,5 +900,3 @@ export function createSimulationEngine(options: CreateSimulationEngineOptions): 
     getDebrief,
   };
 }
-
-

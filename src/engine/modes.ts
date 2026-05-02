@@ -24,7 +24,7 @@ const MODE_CONFIGS: Record<SimMode, ModeConfig> = {
     mode: 'instructor',
     timingMultiplier: 1.15,
     hintIntervalSeconds: 95,
-    maxAutoHints: 2,
+    maxAutoHints: 0,
   },
 };
 

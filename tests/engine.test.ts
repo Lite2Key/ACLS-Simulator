@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CASE } from '../src/cases';
+import { CASES, DEFAULT_CASE } from '../src/cases';
 import { createSimulationEngine } from '../src/engine';
 import type { ActionType } from '../src/engine';
+
+const SEPTIC_SHOCK_CASE = CASES.find((caseDef) => caseDef.metadata.id === 'septic-shock-v1');
 
 function runDeterministicScenario() {
   const engine = createSimulationEngine({
@@ -122,6 +124,52 @@ describe('simulation engine', () => {
     engine.tick(400);
     const state = engine.getState();
 
-    expect(state.narratives.length).toBeLessThanOrEqual(6);
+    expect(state.narratives).toHaveLength(0);
+  });
+
+  it('loads the septic shock case and reaches stabilized outcome after resuscitation sequence', () => {
+    expect(SEPTIC_SHOCK_CASE).toBeDefined();
+    const engine = createSimulationEngine({ caseDef: SEPTIC_SHOCK_CASE!, mode: 'realistic' });
+
+    engine.dispatch({ type: 'start_transfer_to_bed' }, 0);
+    engine.dispatch({ type: 'attach_monitor_leads' }, 0);
+    engine.dispatch({ type: 'establish_iv' }, 0);
+    engine.tick(35);
+
+    engine.dispatch({ type: 'send_lactate' }, 35);
+    engine.dispatch({ type: 'draw_blood_cultures' }, 35);
+    engine.tick(70);
+
+    engine.dispatch({ type: 'give_fluid_bolus' }, 70);
+    engine.dispatch({ type: 'give_fluid_bolus' }, 71);
+    engine.dispatch({ type: 'give_antibiotics' }, 72);
+    engine.dispatch({ type: 'start_norepinephrine' }, 73);
+    engine.dispatch({ type: 'reassess_perfusion' }, 74);
+
+    const state = engine.getState();
+    const debrief = engine.getDebrief();
+
+    expect(state.outcome).toBe('stabilized');
+    expect(state.environment.fluidBolusMl).toBe(2000);
+    expect(debrief.metrics.timeToAntibiotics).toBe(72);
+    expect(debrief.metrics.timeToVasopressor).toBe(73);
+  });
+
+  it('deteriorates septic shock when initial stabilization is missed', () => {
+    expect(SEPTIC_SHOCK_CASE).toBeDefined();
+    const engine = createSimulationEngine({ caseDef: SEPTIC_SHOCK_CASE!, mode: 'realistic' });
+
+    engine.tick(800);
+
+    expect(engine.getState().outcome).toBe('deteriorated');
+  });
+
+  it('keeps expert septic shock play free of automatic coaching prompts', () => {
+    expect(SEPTIC_SHOCK_CASE).toBeDefined();
+    const engine = createSimulationEngine({ caseDef: SEPTIC_SHOCK_CASE!, mode: 'instructor' });
+
+    engine.tick(500);
+
+    expect(engine.getState().narratives).toHaveLength(0);
   });
 });

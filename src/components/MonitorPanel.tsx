@@ -1,4 +1,6 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SimulationState } from '../engine';
+import type { SimulationEnvironmentState, SimulationPatientState } from '../engine/types';
 
 interface MonitorPanelProps {
   state: SimulationState;
@@ -12,27 +14,188 @@ interface WaveformChannelProps {
   color: string;
   active: boolean;
   kind: WaveformKind;
+  patient: SimulationPatientState;
+  environment: SimulationEnvironmentState;
+  traceTime: number;
   mutedLabel?: string;
 }
 
-function buildWavePath(kind: WaveformKind): string {
+const TRACE_WIDTH = 720;
+const TRACE_HEIGHT = 96;
+const TRACE_SECONDS = 8;
+const TRACE_STEP = 3;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function gaussian(phase: number, center: number, width: number, amplitude: number): number {
+  const direct = Math.abs(phase - center);
+  const wrapped = Math.min(direct, 1 - direct);
+  return amplitude * Math.exp(-(wrapped * wrapped) / (2 * width * width));
+}
+
+function phaseAt(seconds: number, ratePerMinute: number): number {
+  const period = 60 / Math.max(ratePerMinute, 1);
+  return ((seconds % period) + period) / period;
+}
+
+function monitorNoise(seconds: number, amount: number): number {
+  return (
+    Math.sin(seconds * 31.7) * amount +
+    Math.sin(seconds * 9.13 + 1.8) * amount * 0.45 +
+    Math.sin(seconds * 55.1 + 0.2) * amount * 0.2
+  );
+}
+
+function ecgSample(phase: number, patient: SimulationPatientState, seconds: number): number {
+  const bradyDepth = patient.hr < 45 ? 2 : 0;
+  const pWave = gaussian(phase, 0.17, 0.025, -5);
+  const qWave = gaussian(phase, 0.352, 0.01, 9);
+  const rWave = gaussian(phase, 0.38, 0.008, -31 - bradyDepth);
+  const sWave = gaussian(phase, 0.405, 0.012, 16);
+  const tWave = gaussian(phase, 0.64, 0.055, -8);
+  return 52 + pWave + qWave + rWave + sWave + tWave + monitorNoise(seconds, 0.45);
+}
+
+function pacedEcgSample(patient: SimulationPatientState, environment: SimulationEnvironmentState, seconds: number): number {
+  const pacerRate = environment.pacingRate ?? 70;
+  const pacedPhase = phaseAt(seconds, pacerRate);
+  const pacingSpike = gaussian(pacedPhase, 0.08, 0.003, -44) + gaussian(pacedPhase, 0.086, 0.003, 32);
+
+  if (!environment.captureConfirmed) {
+    return 52 + pacingSpike + monitorNoise(seconds, 0.5);
+  }
+
+  return pacingSpike + ecgSample(phaseAt(seconds - 0.1, patient.hr), patient, seconds) + gaussian(pacedPhase, 0.2, 0.018, -6);
+}
+
+function plethSample(phase: number, patient: SimulationPatientState, seconds: number): number {
+  const perfusion = clamp((patient.systolicBP - 60) / 55, 0.32, 1.15);
+  const upstroke = gaussian(phase, 0.18, 0.045, -28 * perfusion);
+  const shoulder = gaussian(phase, 0.3, 0.075, -11 * perfusion);
+  const notch = gaussian(phase, 0.43, 0.018, 7 * perfusion);
+  const runoff = gaussian(phase, 0.58, 0.11, -5 * perfusion);
+  return 66 + upstroke + shoulder + notch + runoff + monitorNoise(seconds, 0.65);
+}
+
+function alineSample(phase: number, patient: SimulationPatientState, seconds: number): number {
+  const pulsePressure = clamp(patient.systolicBP - patient.diastolicBP, 18, 75);
+  const amplitude = clamp(pulsePressure / 42, 0.55, 1.5);
+  const systolicPeak = gaussian(phase, 0.16, 0.028, -36 * amplitude);
+  const systolicShoulder = gaussian(phase, 0.24, 0.055, -14 * amplitude);
+  const dicroticNotch = gaussian(phase, 0.39, 0.018, 9 * amplitude);
+  const diastolicRunoff = gaussian(phase, 0.58, 0.16, -7 * amplitude);
+  return 70 + systolicPeak + systolicShoulder + dicroticNotch + diastolicRunoff + monitorNoise(seconds, 0.5);
+}
+
+function etco2Sample(phase: number, patient: SimulationPatientState, seconds: number): number {
+  const etco2 = patient.etco2 ?? 0;
+  const height = clamp(etco2 / 45, 0.18, 1.2);
+
+  if (phase < 0.14) {
+    return 78 + monitorNoise(seconds, 0.25);
+  }
+
+  if (phase < 0.24) {
+    const rise = (phase - 0.14) / 0.1;
+    return 78 - rise * 41 * height + monitorNoise(seconds, 0.2);
+  }
+
+  if (phase < 0.78) {
+    const plateau = (phase - 0.24) / 0.54;
+    return 37 - plateau * 4 * height + monitorNoise(seconds, 0.18);
+  }
+
+  const fall = (phase - 0.78) / 0.08;
+  return fall > 1 ? 78 + monitorNoise(seconds, 0.22) : 33 + fall * 45 * height + monitorNoise(seconds, 0.22);
+}
+
+function sampleWaveform(
+  kind: WaveformKind,
+  seconds: number,
+  patient: SimulationPatientState,
+  environment: SimulationEnvironmentState,
+): number {
+  const cardiacPhase = phaseAt(seconds, patient.hr);
+
   switch (kind) {
     case 'ecg-paced':
-      return 'M0 46 L18 46 L20 8 L22 46 L48 46 L51 28 L55 64 L60 46 L112 46 L114 8 L116 46 L143 46 L146 28 L150 64 L155 46 L208 46 L210 8 L212 46 L240 46 L243 28 L247 64 L252 46 L300 46';
+      return pacedEcgSample(patient, environment, seconds);
     case 'pleth':
-      return 'M0 58 C10 56 14 52 18 42 C23 25 32 24 38 40 C44 58 55 62 70 57 C86 52 90 47 96 36 C104 20 116 24 121 43 C126 61 143 63 160 56 C176 49 182 45 188 35 C197 19 208 25 213 44 C218 61 238 62 254 55 C272 48 278 44 286 35 C294 23 302 27 310 43';
+      return plethSample(phaseAt(seconds - 0.18, patient.hr), patient, seconds);
     case 'aline':
-      return 'M0 64 C8 62 13 58 17 47 L23 18 C25 9 34 9 37 18 L43 44 C49 66 73 70 91 60 C104 54 112 50 122 51 C135 52 145 66 163 62 C173 60 178 55 183 44 L190 18 C192 9 201 9 204 18 L210 45 C216 67 240 70 258 60 C272 52 283 50 300 60';
+      return alineSample(phaseAt(seconds - 0.06, patient.hr), patient, seconds);
     case 'etco2':
-      return 'M0 72 L18 72 L18 50 C18 38 24 28 38 28 L92 28 C102 28 110 36 110 50 L110 72 L142 72 L142 50 C142 38 148 28 162 28 L216 28 C226 28 234 36 234 50 L234 72 L300 72';
+      return etco2Sample(phaseAt(seconds, patient.rr), patient, seconds);
     case 'ecg-brady':
     default:
-      return 'M0 48 L40 48 L44 36 L48 62 L53 48 L122 48 L126 36 L130 62 L135 48 L205 48 L209 36 L213 62 L218 48 L300 48';
+      return ecgSample(cardiacPhase, patient, seconds);
   }
 }
 
-function WaveformChannel({ label, value, color, active, kind, mutedLabel }: WaveformChannelProps) {
-  const path = buildWavePath(kind);
+function buildWavePath(
+  kind: WaveformKind,
+  patient: SimulationPatientState,
+  environment: SimulationEnvironmentState,
+  traceTime: number,
+): string {
+  const points: string[] = [];
+
+  for (let x = 0; x <= TRACE_WIDTH; x += TRACE_STEP) {
+    const seconds = traceTime - TRACE_SECONDS + (x / TRACE_WIDTH) * TRACE_SECONDS;
+    const y = clamp(sampleWaveform(kind, seconds, patient, environment), 5, TRACE_HEIGHT - 6);
+    points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  }
+
+  return `M${points.join(' L')}`;
+}
+
+function flatlinePath(traceTime: number): string {
+  const points: string[] = [];
+
+  for (let x = 0; x <= TRACE_WIDTH; x += TRACE_STEP) {
+    const seconds = traceTime - TRACE_SECONDS + (x / TRACE_WIDTH) * TRACE_SECONDS;
+    const y = 52 + monitorNoise(seconds, 0.18);
+    points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  }
+
+  return `M${points.join(' L')}`;
+}
+
+function useTraceClock(): number {
+  const [traceTime, setTraceTime] = useState(0);
+
+  useEffect(() => {
+    const startedAt = performance.now();
+    const intervalId = window.setInterval(() => {
+      setTraceTime((performance.now() - startedAt) / 1000);
+    }, 80);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  return traceTime;
+}
+
+function WaveformChannel({
+  label,
+  value,
+  color,
+  active,
+  kind,
+  patient,
+  environment,
+  traceTime,
+  mutedLabel,
+}: WaveformChannelProps) {
+  const path = useMemo(
+    () => (active ? buildWavePath(kind, patient, environment, traceTime) : flatlinePath(traceTime)),
+    [active, environment, kind, patient, traceTime],
+  );
+  const gradientId = `fade-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
 
   return (
     <div className={`wave-channel ${active ? '' : 'wave-channel-off'}`} data-testid={`wave-${label.toLowerCase()}`}>
@@ -40,28 +203,76 @@ function WaveformChannel({ label, value, color, active, kind, mutedLabel }: Wave
         <span style={{ color }}>{label}</span>
         <strong>{active ? value : (mutedLabel ?? 'STANDBY')}</strong>
       </div>
-      <svg viewBox="0 0 300 86" role="img" aria-label={`${label} waveform`}>
+      <svg viewBox={`0 0 ${TRACE_WIDTH} ${TRACE_HEIGHT}`} role="img" aria-label={`${label} waveform`}>
         <defs>
-          <linearGradient id={`fade-${label}`} x1="0" x2="1">
+          <linearGradient id={gradientId} x1="0" x2="1">
             <stop offset="0%" stopColor="transparent" />
-            <stop offset="12%" stopColor={color} />
+            <stop offset="9%" stopColor={color} stopOpacity="0.55" />
+            <stop offset="18%" stopColor={color} />
             <stop offset="100%" stopColor={color} />
           </linearGradient>
         </defs>
         <g className="monitor-grid-lines">
-          <path d="M0 22 H300 M0 48 H300 M0 74 H300 M60 0 V86 M120 0 V86 M180 0 V86 M240 0 V86" />
+          <path d="M0 24 H720 M0 48 H720 M0 72 H720 M60 0 V96 M120 0 V96 M180 0 V96 M240 0 V96 M300 0 V96 M360 0 V96 M420 0 V96 M480 0 V96 M540 0 V96 M600 0 V96 M660 0 V96" />
         </g>
+        <path className="calibration-pulse" d="M10 72 H22 V32 H42 V72 H54" />
         {active ? (
-          <path
-            className="wave-path"
-            d={path}
-            stroke={`url(#fade-${label})`}
-            style={{ animationDuration: kind === 'ecg-brady' ? '3.5s' : '2.4s' }}
-          />
+          <>
+            <path className="wave-glow" d={path} stroke={color} />
+            <path className="wave-path" d={path} stroke={`url(#${gradientId})`} />
+            <line className="trace-cursor" x1={TRACE_WIDTH - 8} y1="7" x2={TRACE_WIDTH - 8} y2={TRACE_HEIGHT - 7} />
+          </>
         ) : (
-          <path className="wave-flat" d="M0 48 H300" />
+          <path className="wave-flat" d={path} />
         )}
       </svg>
+    </div>
+  );
+}
+
+function usePreviousPatient(patient: SimulationPatientState): SimulationPatientState {
+  const previousRef = useRef(patient);
+
+  useEffect(() => {
+    previousRef.current = patient;
+  }, [patient]);
+
+  return previousRef.current;
+}
+
+function trendFor(current: number | null, previous: number | null): 'up' | 'down' | 'same' {
+  if (current === null || previous === null || Math.abs(current - previous) < 1) {
+    return 'same';
+  }
+
+  return current > previous ? 'up' : 'down';
+}
+
+function trendGlyph(trend: 'up' | 'down' | 'same'): string {
+  if (trend === 'up') {
+    return 'UP';
+  }
+
+  if (trend === 'down') {
+    return 'DN';
+  }
+
+  return 'ST';
+}
+
+interface NumericTileProps {
+  label: string;
+  value: string | number;
+  colorClass: string;
+  trend: 'up' | 'down' | 'same';
+}
+
+function NumericTile({ label, value, colorClass, trend }: NumericTileProps) {
+  return (
+    <div className={`numeric-tile ${colorClass} ${trend !== 'same' ? 'numeric-changed' : ''}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <em className={`trend trend-${trend}`}>{trendGlyph(trend)}</em>
     </div>
   );
 }
@@ -75,11 +286,17 @@ function rhythmLabel(state: SimulationState): string {
     return 'PACED';
   }
 
+  if (state.patient.rhythm === 'sinus_tachycardia') {
+    return 'SINUS TACH';
+  }
+
   return 'SINUS BRADY';
 }
 
 export function MonitorPanel({ state }: MonitorPanelProps) {
   const { patient, environment } = state;
+  const traceTime = useTraceClock();
+  const previousPatient = usePreviousPatient(patient);
   const ecgActive = environment.monitorLeadsAttached;
   const plethActive = environment.monitorLeadsAttached;
   const alineActive = environment.arterialLine;
@@ -102,6 +319,9 @@ export function MonitorPanel({ state }: MonitorPanelProps) {
             color="#7cff5b"
             active={ecgActive}
             kind={ecgKind}
+            patient={patient}
+            environment={environment}
+            traceTime={traceTime}
             mutedLabel="LEADS OFF"
           />
           <WaveformChannel
@@ -110,6 +330,9 @@ export function MonitorPanel({ state }: MonitorPanelProps) {
             color="#54a9ff"
             active={plethActive}
             kind="pleth"
+            patient={patient}
+            environment={environment}
+            traceTime={traceTime}
             mutedLabel="NO PULSE OX"
           />
           <WaveformChannel
@@ -118,6 +341,9 @@ export function MonitorPanel({ state }: MonitorPanelProps) {
             color="#ff3f3f"
             active={alineActive}
             kind="aline"
+            patient={patient}
+            environment={environment}
+            traceTime={traceTime}
             mutedLabel="NOT ZEROED"
           />
           <WaveformChannel
@@ -126,37 +352,59 @@ export function MonitorPanel({ state }: MonitorPanelProps) {
             color="#ffd84d"
             active={etco2Active}
             kind="etco2"
+            patient={patient}
+            environment={environment}
+            traceTime={traceTime}
             mutedLabel="NO SAMPLE"
           />
         </div>
 
         <aside className="numeric-stack" aria-label="numeric vitals">
-          <div className="numeric-tile numeric-green">
-            <span>HR</span>
-            <strong>{ecgActive ? patient.hr : '--'}</strong>
-          </div>
-          <div className="numeric-tile numeric-blue">
-            <span>SpO2</span>
-            <strong>{plethActive ? patient.spo2 : '--'}</strong>
-          </div>
-          <div className="numeric-tile numeric-red">
-            <span>BP</span>
-            <strong>
-              {alineActive ? `${patient.systolicBP}/${patient.diastolicBP}` : `${patient.systolicBP}/${patient.diastolicBP}`}
-            </strong>
-          </div>
-          <div className="numeric-tile numeric-yellow">
-            <span>EtCO2</span>
-            <strong>{etco2Active && patient.etco2 !== null ? patient.etco2 : '--'}</strong>
-          </div>
+          <NumericTile
+            label="HR"
+            value={ecgActive ? patient.hr : '--'}
+            colorClass="numeric-green"
+            trend={trendFor(patient.hr, previousPatient.hr)}
+          />
+          <NumericTile
+            label="SpO2"
+            value={plethActive ? patient.spo2 : '--'}
+            colorClass="numeric-blue"
+            trend={trendFor(patient.spo2, previousPatient.spo2)}
+          />
+          <NumericTile
+            label="BP"
+            value={`${patient.systolicBP}/${patient.diastolicBP}`}
+            colorClass="numeric-red"
+            trend={trendFor(patient.systolicBP, previousPatient.systolicBP)}
+          />
+          <NumericTile
+            label="EtCO2"
+            value={etco2Active && patient.etco2 !== null ? patient.etco2 : '--'}
+            colorClass="numeric-yellow"
+            trend={trendFor(patient.etco2, previousPatient.etco2)}
+          />
         </aside>
       </div>
 
       <div className="monitor-footer">
-        <span className={environment.defibPadsAttached ? 'status-on' : ''}>Pads</span>
-        <span className={environment.syncEnabled ? 'status-on' : ''}>Sync</span>
-        <span className={environment.pacingModeActive ? 'status-on' : ''}>Pacer</span>
-        <span className={environment.captureConfirmed ? 'status-on' : ''}>Capture</span>
+        <span className={environment.monitorLeadsAttached ? 'status-on' : ''}>
+          {environment.monitorLeadsAttached ? 'Leads On' : 'Leads Off'}
+        </span>
+        <span className={environment.defibPadsAttached ? 'status-on' : ''}>
+          {environment.defibPadsAttached ? 'Pads On' : 'Pads Off'}
+        </span>
+        <span className={environment.syncEnabled ? 'status-on' : ''}>
+          {environment.syncEnabled ? 'Sync On' : 'Sync Off'}
+        </span>
+        <span className={environment.pacingModeActive ? 'status-on' : ''}>
+          {environment.pacingModeActive ? 'Pacer Armed' : 'Pacer Standby'}
+        </span>
+        <span className={environment.captureConfirmed ? 'status-on' : 'status-waiting'}>
+          {environment.captureConfirmed ? 'Capture Confirmed' : 'Capture Needed'}
+        </span>
+        {patient.temperatureC ? <span>Temp {patient.temperatureC.toFixed(1)}C</span> : null}
+        {patient.lactate !== null && patient.lactate !== undefined ? <span>Lactate {patient.lactate.toFixed(1)}</span> : null}
         <span>{patient.statusText}</span>
       </div>
     </div>

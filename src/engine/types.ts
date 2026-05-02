@@ -1,26 +1,6 @@
 import type { CaseActionDefinition, CaseDefinitionV2, SimMode } from '../types/case';
 
-export type ActionType =
-  | 'start_transfer_to_bed'
-  | 'start_ems_handoff'
-  | 'attach_monitor_leads'
-  | 'attach_defib_pads'
-  | 'start_oxygen'
-  | 'establish_iv'
-  | 'establish_io'
-  | 'place_arterial_line'
-  | 'attach_capnography'
-  | 'give_atropine'
-  | 'toggle_sync_on'
-  | 'toggle_sync_off'
-  | 'set_cardioversion_energy_100'
-  | 'deliver_cardioversion'
-  | 'start_pacing_mode'
-  | 'set_pacing_rate_70'
-  | 'set_pacing_current_40'
-  | 'set_pacing_current_70'
-  | 'confirm_capture'
-  | 'acknowledge_narrative';
+export type ActionType = string;
 
 export interface UserAction {
   type: ActionType;
@@ -40,7 +20,9 @@ export interface SimulationPatientState {
   spo2: number;
   rr: number;
   etco2: number | null;
-  rhythm: 'sinus_bradycardia' | 'paced' | 'unstable_tachyarrhythmia';
+  temperatureC?: number;
+  lactate?: number | null;
+  rhythm: 'sinus_bradycardia' | 'sinus_tachycardia' | 'paced' | 'unstable_tachyarrhythmia';
   hasPulse: boolean;
   mentalStatus: 'alert' | 'verbal' | 'pain' | 'unresponsive';
   statusText: string;
@@ -61,6 +43,14 @@ export interface SimulationEnvironmentState {
   pacingCurrentMa: number | null;
   captureConfirmed: boolean;
   cardioversionEnergyJ: number | null;
+  lactateSent?: boolean;
+  bloodCulturesDrawn?: boolean;
+  fluidsStarted?: boolean;
+  fluidBolusMl?: number;
+  antibioticsGiven?: boolean;
+  vasopressorStarted?: boolean;
+  icuCalled?: boolean;
+  perfusionReassessed?: boolean;
 }
 
 export interface ActiveTask {
@@ -88,13 +78,7 @@ export interface TimelineEntry {
   action?: ActionType;
 }
 
-export interface DebriefMetrics {
-  timeToMonitor: number | null;
-  timeToPads: number | null;
-  timeToPacingInitiation: number | null;
-  timeToCapture: number | null;
-  algorithmDeviationCount: number;
-}
+export type DebriefMetrics = Record<string, number | null>;
 
 export interface DebriefReport {
   caseId: string;
@@ -104,6 +88,7 @@ export interface DebriefReport {
   criticalMisses: string[];
   goodDecisions: string[];
   metrics: DebriefMetrics;
+  metricLabels: Record<string, string>;
 }
 
 export interface NarrativeItem {

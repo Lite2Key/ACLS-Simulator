@@ -21,12 +21,25 @@
     "metadata": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "title", "presentationTitle", "category", "estimatedMinutes", "learningObjectives"],
+      "required": [
+        "id",
+        "title",
+        "presentationTitle",
+        "category",
+        "module",
+        "difficulty",
+        "clinicalStem",
+        "estimatedMinutes",
+        "learningObjectives"
+      ],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "title": { "type": "string", "minLength": 1 },
         "presentationTitle": { "type": "string", "minLength": 1 },
         "category": { "type": "string", "minLength": 1 },
+        "module": { "type": "string", "minLength": 1 },
+        "difficulty": { "type": "string", "enum": ["foundational", "intermediate", "expert"] },
+        "clinicalStem": { "type": "string", "minLength": 1 },
         "estimatedMinutes": { "type": "number", "minimum": 1 },
         "learningObjectives": {
           "type": "array",
@@ -50,29 +63,8 @@
     },
     "timings": {
       "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "transferToBed",
-        "emsHandoff",
-        "attachLeads",
-        "attachPads",
-        "startOxygen",
-        "establishIV",
-        "establishIO",
-        "placeArterialLine",
-        "attachCapnography"
-      ],
-      "properties": {
-        "transferToBed": { "$ref": "#/$defs/modeSeconds" },
-        "emsHandoff": { "$ref": "#/$defs/modeSeconds" },
-        "attachLeads": { "$ref": "#/$defs/modeSeconds" },
-        "attachPads": { "$ref": "#/$defs/modeSeconds" },
-        "startOxygen": { "$ref": "#/$defs/modeSeconds" },
-        "establishIV": { "$ref": "#/$defs/modeSeconds" },
-        "establishIO": { "$ref": "#/$defs/modeSeconds" },
-        "placeArterialLine": { "$ref": "#/$defs/modeSeconds" },
-        "attachCapnography": { "$ref": "#/$defs/modeSeconds" }
-      }
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/modeSeconds" }
     },
     "initialState": {
       "type": "object",
@@ -101,9 +93,11 @@
             "spo2": { "type": "number", "minimum": 0, "maximum": 100 },
             "rr": { "type": "number", "minimum": 0 },
             "etco2": { "type": ["number", "null"], "minimum": 0 },
+            "temperatureC": { "type": "number", "minimum": 20, "maximum": 45 },
+            "lactate": { "type": ["number", "null"], "minimum": 0 },
             "rhythm": {
               "type": "string",
-              "enum": ["sinus_bradycardia", "paced", "unstable_tachyarrhythmia"]
+              "enum": ["sinus_bradycardia", "sinus_tachycardia", "paced", "unstable_tachyarrhythmia"]
             },
             "hasPulse": { "type": "boolean" },
             "mentalStatus": {
@@ -146,7 +140,15 @@
             "pacingRate": { "type": ["number", "null"] },
             "pacingCurrentMa": { "type": ["number", "null"] },
             "captureConfirmed": { "type": "boolean" },
-            "cardioversionEnergyJ": { "type": ["number", "null"] }
+            "cardioversionEnergyJ": { "type": ["number", "null"] },
+            "lactateSent": { "type": "boolean" },
+            "bloodCulturesDrawn": { "type": "boolean" },
+            "fluidsStarted": { "type": "boolean" },
+            "fluidBolusMl": { "type": "number", "minimum": 0 },
+            "antibioticsGiven": { "type": "boolean" },
+            "vasopressorStarted": { "type": "boolean" },
+            "icuCalled": { "type": "boolean" },
+            "perfusionReassessed": { "type": "boolean" }
           }
         }
       }
@@ -176,7 +178,7 @@
     "debriefRules": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["criticalActions", "goodDecisionActions", "algorithmDeviationActions"],
+      "required": ["criticalActions", "goodDecisionActions", "algorithmDeviationActions", "metricLabels"],
       "properties": {
         "criticalActions": {
           "type": "array",
@@ -189,6 +191,11 @@
         "algorithmDeviationActions": {
           "type": "array",
           "items": { "$ref": "#/$defs/actionType" }
+        },
+        "metricLabels": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "type": "string", "minLength": 1 }
         }
       }
     },
@@ -210,28 +217,7 @@
     },
     "actionType": {
       "type": "string",
-      "enum": [
-        "start_transfer_to_bed",
-        "start_ems_handoff",
-        "attach_monitor_leads",
-        "attach_defib_pads",
-        "start_oxygen",
-        "establish_iv",
-        "establish_io",
-        "place_arterial_line",
-        "attach_capnography",
-        "give_atropine",
-        "toggle_sync_on",
-        "toggle_sync_off",
-        "set_cardioversion_energy_100",
-        "deliver_cardioversion",
-        "start_pacing_mode",
-        "set_pacing_rate_70",
-        "set_pacing_current_40",
-        "set_pacing_current_70",
-        "confirm_capture",
-        "acknowledge_narrative"
-      ]
+      "minLength": 1
     },
     "actionDef": {
       "type": "object",
@@ -242,23 +228,24 @@
         "label": { "type": "string", "minLength": 1 },
         "category": {
           "type": "string",
-          "enum": ["assessment", "monitoring", "access", "airway", "electrical", "medication", "communication"]
-        },
-        "kind": { "type": "string", "enum": ["task", "instant"] },
-        "taskTimingKey": {
-          "type": "string",
           "enum": [
-            "transferToBed",
-            "emsHandoff",
-            "attachLeads",
-            "attachPads",
-            "startOxygen",
-            "establishIV",
-            "establishIO",
-            "placeArterialLine",
-            "attachCapnography"
+            "assessment",
+            "monitoring",
+            "access",
+            "airway",
+            "electrical",
+            "medication",
+            "communication",
+            "resuscitation",
+            "labs",
+            "source"
           ]
         },
+        "kind": { "type": "string", "enum": ["task", "instant"] },
+        "taskTimingKey": { "type": "string", "minLength": 1 },
+        "effect": { "$ref": "#/$defs/actionEffect" },
+        "completionEffect": { "$ref": "#/$defs/actionEffect" },
+        "metricKey": { "type": "string", "minLength": 1 },
         "description": { "type": "string" },
         "majorBeat": { "type": "boolean" },
         "hidden": { "type": "boolean" }
@@ -276,7 +263,21 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["monitorLeadsAttached", "defibPadsAttached", "hasVascularAccess", "syncEnabled", "pacingModeActive", "pacingRateSet", "pacingCurrentSet", "captureConfirmed"]
+            "enum": [
+              "monitorLeadsAttached",
+              "defibPadsAttached",
+              "hasVascularAccess",
+              "syncEnabled",
+              "pacingModeActive",
+              "pacingRateSet",
+              "pacingCurrentSet",
+              "captureConfirmed",
+              "bloodCulturesDrawn",
+              "lactateSent",
+              "fluidsStarted",
+              "antibioticsGiven",
+              "vasopressorStarted"
+            ]
           }
         },
         "message": { "type": "string", "minLength": 1 },
@@ -299,9 +300,50 @@
         "requiresAcknowledgement": { "type": "boolean" },
         "condition": {
           "type": "string",
-          "enum": ["ifNoPads", "ifNoAccess", "ifNoPacingSetup", "ifNoCapture"]
+          "enum": [
+            "ifNoPads",
+            "ifNoAccess",
+            "ifNoPacingSetup",
+            "ifNoCapture",
+            "ifNoFluids",
+            "ifNoAntibiotics",
+            "ifNoVasopressor",
+            "ifShockUnresolved"
+          ]
         }
       }
+    },
+    "actionEffect": {
+      "type": "string",
+      "enum": [
+        "transfer_to_bed_complete",
+        "ems_handoff_complete",
+        "attach_monitor_leads_complete",
+        "attach_defib_pads_complete",
+        "start_oxygen_complete",
+        "establish_iv_complete",
+        "establish_io_complete",
+        "place_arterial_line_complete",
+        "attach_capnography_complete",
+        "send_lactate_complete",
+        "draw_blood_cultures_complete",
+        "give_atropine",
+        "enable_sync",
+        "disable_sync",
+        "set_cardioversion_energy_100",
+        "deliver_cardioversion",
+        "start_pacing_mode",
+        "set_pacing_rate_70",
+        "set_pacing_current_40",
+        "set_pacing_current_70",
+        "confirm_capture",
+        "give_fluid_bolus",
+        "give_antibiotics",
+        "start_norepinephrine",
+        "reassess_perfusion",
+        "call_icu",
+        "acknowledge_narrative"
+      ]
     }
   }
 }

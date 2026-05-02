@@ -4,6 +4,9 @@
     "title": "Unstable Bradycardia: Deliberate Pacing Setup",
     "presentationTitle": "Dizzy, Diaphoretic, and Hypotensive",
     "category": "Bradycardia",
+    "module": "ACLS-adjacent Resuscitation",
+    "difficulty": "intermediate",
+    "clinicalStem": "A 68-year-old man arrives pale, dizzy, diaphoretic, and hypotensive after EMS noted profound bradycardia.",
     "estimatedMinutes": 8,
     "learningObjectives": [
       "Separate monitor leads from therapy pads",
@@ -61,14 +64,16 @@
       "label": "Transfer Patient to Bed",
       "category": "communication",
       "kind": "task",
-      "taskTimingKey": "transferToBed"
+      "taskTimingKey": "transferToBed",
+      "completionEffect": "transfer_to_bed_complete"
     },
     {
       "id": "start_ems_handoff",
       "label": "Start EMS Handoff",
       "category": "communication",
       "kind": "task",
-      "taskTimingKey": "emsHandoff"
+      "taskTimingKey": "emsHandoff",
+      "completionEffect": "ems_handoff_complete"
     },
     {
       "id": "attach_monitor_leads",
@@ -76,6 +81,8 @@
       "category": "monitoring",
       "kind": "task",
       "taskTimingKey": "attachLeads",
+      "completionEffect": "attach_monitor_leads_complete",
+      "metricKey": "timeToMonitor",
       "majorBeat": true
     },
     {
@@ -84,6 +91,8 @@
       "category": "electrical",
       "kind": "task",
       "taskTimingKey": "attachPads",
+      "completionEffect": "attach_defib_pads_complete",
+      "metricKey": "timeToPads",
       "majorBeat": true
     },
     {
@@ -91,7 +100,8 @@
       "label": "Apply Supplemental Oxygen",
       "category": "airway",
       "kind": "task",
-      "taskTimingKey": "startOxygen"
+      "taskTimingKey": "startOxygen",
+      "completionEffect": "start_oxygen_complete"
     },
     {
       "id": "establish_iv",
@@ -99,6 +109,7 @@
       "category": "access",
       "kind": "task",
       "taskTimingKey": "establishIV",
+      "completionEffect": "establish_iv_complete",
       "majorBeat": true
     },
     {
@@ -106,59 +117,69 @@
       "label": "Establish IO Access",
       "category": "access",
       "kind": "task",
-      "taskTimingKey": "establishIO"
+      "taskTimingKey": "establishIO",
+      "completionEffect": "establish_io_complete"
     },
     {
       "id": "place_arterial_line",
       "label": "Place Arterial Line",
       "category": "monitoring",
       "kind": "task",
-      "taskTimingKey": "placeArterialLine"
+      "taskTimingKey": "placeArterialLine",
+      "completionEffect": "place_arterial_line_complete"
     },
     {
       "id": "attach_capnography",
       "label": "Attach EtCO2 Monitoring",
       "category": "monitoring",
       "kind": "task",
-      "taskTimingKey": "attachCapnography"
+      "taskTimingKey": "attachCapnography",
+      "completionEffect": "attach_capnography_complete"
     },
     {
       "id": "give_atropine",
       "label": "Give Atropine 1 mg IV/IO",
       "category": "medication",
       "kind": "instant",
+      "effect": "give_atropine",
       "majorBeat": true
     },
     {
       "id": "toggle_sync_on",
       "label": "Enable Sync Mode",
       "category": "electrical",
-      "kind": "instant"
+      "kind": "instant",
+      "effect": "enable_sync"
     },
     {
       "id": "toggle_sync_off",
       "label": "Disable Sync Mode",
       "category": "electrical",
       "kind": "instant",
+      "effect": "disable_sync",
       "hidden": true
     },
     {
       "id": "set_cardioversion_energy_100",
       "label": "Set Cardioversion Energy 100J",
       "category": "electrical",
-      "kind": "instant"
+      "kind": "instant",
+      "effect": "set_cardioversion_energy_100"
     },
     {
       "id": "deliver_cardioversion",
       "label": "Deliver Cardioversion",
       "category": "electrical",
-      "kind": "instant"
+      "kind": "instant",
+      "effect": "deliver_cardioversion"
     },
     {
       "id": "start_pacing_mode",
       "label": "Start Pacing Mode",
       "category": "electrical",
       "kind": "instant",
+      "effect": "start_pacing_mode",
+      "metricKey": "timeToPacingInitiation",
       "majorBeat": true
     },
     {
@@ -166,19 +187,22 @@
       "label": "Set Pacing Rate to 70",
       "category": "electrical",
       "kind": "instant",
+      "effect": "set_pacing_rate_70",
       "majorBeat": true
     },
     {
       "id": "set_pacing_current_40",
       "label": "Set Pacing Current to 40 mA",
       "category": "electrical",
-      "kind": "instant"
+      "kind": "instant",
+      "effect": "set_pacing_current_40"
     },
     {
       "id": "set_pacing_current_70",
       "label": "Set Pacing Current to 70 mA",
       "category": "electrical",
       "kind": "instant",
+      "effect": "set_pacing_current_70",
       "majorBeat": true
     },
     {
@@ -186,6 +210,8 @@
       "label": "Confirm Mechanical Capture",
       "category": "electrical",
       "kind": "instant",
+      "effect": "confirm_capture",
+      "metricKey": "timeToCapture",
       "majorBeat": true
     },
     {
@@ -193,6 +219,7 @@
       "label": "Acknowledge Team Update",
       "category": "communication",
       "kind": "instant",
+      "effect": "acknowledge_narrative",
       "hidden": true
     }
   ],
@@ -310,7 +337,14 @@
     "algorithmDeviationActions": [
       "deliver_cardioversion",
       "set_pacing_current_40"
-    ]
+    ],
+    "metricLabels": {
+      "timeToMonitor": "Time to monitor",
+      "timeToPads": "Time to pads",
+      "timeToPacingInitiation": "Time to pacing start",
+      "timeToCapture": "Time to capture",
+      "algorithmDeviationCount": "Algorithm deviations"
+    }
   },
   "teachingPoints": [
     "Leads provide rhythm information; pads provide electrical therapy capability.",

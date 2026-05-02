@@ -10,6 +10,10 @@ function metricValue(value: number | null): string {
   return value === null ? 'N/A' : `${value}s`;
 }
 
+function isCountMetric(metricKey: string): boolean {
+  return metricKey.toLowerCase().includes('count');
+}
+
 export function DebriefPanel({ debrief, teachingPoints, outcome }: DebriefPanelProps) {
   return (
     <div>
@@ -22,11 +26,11 @@ export function DebriefPanel({ debrief, teachingPoints, outcome }: DebriefPanelP
         <section>
           <h3>Key Metrics</h3>
           <ul>
-            <li>Time to monitor: {metricValue(debrief.metrics.timeToMonitor)}</li>
-            <li>Time to pads: {metricValue(debrief.metrics.timeToPads)}</li>
-            <li>Time to pacing start: {metricValue(debrief.metrics.timeToPacingInitiation)}</li>
-            <li>Time to capture: {metricValue(debrief.metrics.timeToCapture)}</li>
-            <li>Algorithm deviations: {debrief.metrics.algorithmDeviationCount}</li>
+            {Object.entries(debrief.metricLabels).map(([metricKey, label]) => (
+              <li key={metricKey}>
+                {label}: {isCountMetric(metricKey) ? (debrief.metrics[metricKey] ?? 0) : metricValue(debrief.metrics[metricKey] ?? null)}
+              </li>
+            ))}
           </ul>
         </section>
 

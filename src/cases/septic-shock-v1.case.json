@@ -1,0 +1,349 @@
+{
+  "metadata": {
+    "id": "septic-shock-v1",
+    "title": "Septic Shock: Early Resuscitation and Reassessment",
+    "presentationTitle": "Fever, Confusion, and Hypotension",
+    "category": "Shock",
+    "module": "General EM Resuscitation",
+    "difficulty": "intermediate",
+    "clinicalStem": "A 74-year-old woman arrives from a nursing facility febrile, confused, tachycardic, and hypotensive after two days of cough and poor intake.",
+    "estimatedMinutes": 10,
+    "learningObjectives": [
+      "Recognize septic shock physiology early",
+      "Run parallel access, monitoring, cultures, fluids, antibiotics, and vasopressor preparation",
+      "Avoid anchoring on fluids alone when hypotension persists",
+      "Reassess perfusion and disposition after initial stabilization"
+    ]
+  },
+  "defaultMode": "realistic",
+  "modes": ["guided", "realistic", "instructor"],
+  "timings": {
+    "transferToBed": { "guided": 18, "realistic": 28, "instructor": 35 },
+    "emsHandoff": { "guided": 14, "realistic": 20, "instructor": 26 },
+    "attachLeads": { "guided": 8, "realistic": 14, "instructor": 18 },
+    "startOxygen": { "guided": 5, "realistic": 8, "instructor": 10 },
+    "establishIV": { "guided": 18, "realistic": 28, "instructor": 36 },
+    "establishIO": { "guided": 15, "realistic": 22, "instructor": 28 },
+    "placeArterialLine": { "guided": 32, "realistic": 48, "instructor": 58 },
+    "attachCapnography": { "guided": 8, "realistic": 12, "instructor": 15 },
+    "sendLactate": { "guided": 12, "realistic": 18, "instructor": 24 },
+    "drawBloodCultures": { "guided": 20, "realistic": 30, "instructor": 38 }
+  },
+  "initialState": {
+    "patient": {
+      "hr": 132,
+      "systolicBP": 74,
+      "diastolicBP": 42,
+      "spo2": 91,
+      "rr": 28,
+      "etco2": null,
+      "temperatureC": 39.3,
+      "lactate": null,
+      "rhythm": "sinus_tachycardia",
+      "hasPulse": true,
+      "mentalStatus": "verbal",
+      "statusText": "Patient is febrile, confused, tachypneic, and poorly perfused."
+    },
+    "environment": {
+      "onBed": false,
+      "monitorLeadsAttached": false,
+      "defibPadsAttached": false,
+      "syncEnabled": false,
+      "oxygenOn": false,
+      "ivAccess": false,
+      "ioAccess": false,
+      "arterialLine": false,
+      "capnography": false,
+      "pacingModeActive": false,
+      "pacingRate": null,
+      "pacingCurrentMa": null,
+      "captureConfirmed": false,
+      "cardioversionEnergyJ": null,
+      "lactateSent": false,
+      "bloodCulturesDrawn": false,
+      "fluidsStarted": false,
+      "fluidBolusMl": 0,
+      "antibioticsGiven": false,
+      "vasopressorStarted": false,
+      "icuCalled": false,
+      "perfusionReassessed": false
+    }
+  },
+  "actions": [
+    {
+      "id": "start_transfer_to_bed",
+      "label": "Transfer Patient to Bed",
+      "category": "communication",
+      "kind": "task",
+      "taskTimingKey": "transferToBed",
+      "completionEffect": "transfer_to_bed_complete"
+    },
+    {
+      "id": "start_ems_handoff",
+      "label": "Start EMS Handoff",
+      "category": "communication",
+      "kind": "task",
+      "taskTimingKey": "emsHandoff",
+      "completionEffect": "ems_handoff_complete"
+    },
+    {
+      "id": "attach_monitor_leads",
+      "label": "Attach Monitor Leads",
+      "category": "monitoring",
+      "kind": "task",
+      "taskTimingKey": "attachLeads",
+      "completionEffect": "attach_monitor_leads_complete",
+      "metricKey": "timeToMonitor",
+      "majorBeat": true
+    },
+    {
+      "id": "start_oxygen",
+      "label": "Apply Supplemental Oxygen",
+      "category": "airway",
+      "kind": "task",
+      "taskTimingKey": "startOxygen",
+      "completionEffect": "start_oxygen_complete"
+    },
+    {
+      "id": "establish_iv",
+      "label": "Establish Two Large-Bore IVs",
+      "category": "access",
+      "kind": "task",
+      "taskTimingKey": "establishIV",
+      "completionEffect": "establish_iv_complete",
+      "metricKey": "timeToAccess",
+      "majorBeat": true
+    },
+    {
+      "id": "establish_io",
+      "label": "Place IO Access",
+      "category": "access",
+      "kind": "task",
+      "taskTimingKey": "establishIO",
+      "completionEffect": "establish_io_complete"
+    },
+    {
+      "id": "place_arterial_line",
+      "label": "Place Arterial Line",
+      "category": "monitoring",
+      "kind": "task",
+      "taskTimingKey": "placeArterialLine",
+      "completionEffect": "place_arterial_line_complete"
+    },
+    {
+      "id": "attach_capnography",
+      "label": "Attach EtCO2 Monitoring",
+      "category": "monitoring",
+      "kind": "task",
+      "taskTimingKey": "attachCapnography",
+      "completionEffect": "attach_capnography_complete"
+    },
+    {
+      "id": "send_lactate",
+      "label": "Send Lactate",
+      "category": "labs",
+      "kind": "task",
+      "taskTimingKey": "sendLactate",
+      "completionEffect": "send_lactate_complete",
+      "metricKey": "timeToLactate",
+      "majorBeat": true
+    },
+    {
+      "id": "draw_blood_cultures",
+      "label": "Draw Blood Cultures",
+      "category": "labs",
+      "kind": "task",
+      "taskTimingKey": "drawBloodCultures",
+      "completionEffect": "draw_blood_cultures_complete",
+      "metricKey": "timeToCultures",
+      "majorBeat": true
+    },
+    {
+      "id": "give_fluid_bolus",
+      "label": "Give 1L Balanced Crystalloid",
+      "category": "resuscitation",
+      "kind": "instant",
+      "effect": "give_fluid_bolus",
+      "metricKey": "timeToFluids",
+      "majorBeat": true
+    },
+    {
+      "id": "give_antibiotics",
+      "label": "Start Broad-Spectrum Antibiotics",
+      "category": "medication",
+      "kind": "instant",
+      "effect": "give_antibiotics",
+      "metricKey": "timeToAntibiotics",
+      "majorBeat": true
+    },
+    {
+      "id": "start_norepinephrine",
+      "label": "Start Norepinephrine",
+      "category": "resuscitation",
+      "kind": "instant",
+      "effect": "start_norepinephrine",
+      "metricKey": "timeToVasopressor",
+      "majorBeat": true
+    },
+    {
+      "id": "reassess_perfusion",
+      "label": "Reassess Perfusion",
+      "category": "assessment",
+      "kind": "instant",
+      "effect": "reassess_perfusion",
+      "metricKey": "timeToReassessment",
+      "majorBeat": true
+    },
+    {
+      "id": "call_icu",
+      "label": "Call ICU",
+      "category": "communication",
+      "kind": "instant",
+      "effect": "call_icu"
+    },
+    {
+      "id": "acknowledge_narrative",
+      "label": "Acknowledge Team Update",
+      "category": "communication",
+      "kind": "instant",
+      "effect": "acknowledge_narrative",
+      "hidden": true
+    }
+  ],
+  "gates": [
+    {
+      "id": "lactate_requires_access",
+      "type": "hard",
+      "action": "send_lactate",
+      "requires": ["hasVascularAccess"],
+      "message": "Cannot send lactate without IV/IO access."
+    },
+    {
+      "id": "cultures_require_access",
+      "type": "hard",
+      "action": "draw_blood_cultures",
+      "requires": ["hasVascularAccess"],
+      "message": "Cannot draw cultures without IV/IO access."
+    },
+    {
+      "id": "fluids_require_access",
+      "type": "hard",
+      "action": "give_fluid_bolus",
+      "requires": ["hasVascularAccess"],
+      "message": "Cannot start a fluid bolus without IV/IO access."
+    },
+    {
+      "id": "antibiotics_require_access",
+      "type": "hard",
+      "action": "give_antibiotics",
+      "requires": ["hasVascularAccess"],
+      "message": "Cannot give antibiotics without IV/IO access."
+    },
+    {
+      "id": "cultures_before_antibiotics",
+      "type": "soft",
+      "action": "give_antibiotics",
+      "requires": ["bloodCulturesDrawn"],
+      "message": "Antibiotics started before blood cultures were drawn.",
+      "penalty": 3,
+      "onFailureEffect": "none"
+    },
+    {
+      "id": "norepinephrine_requires_access",
+      "type": "hard",
+      "action": "start_norepinephrine",
+      "requires": ["hasVascularAccess"],
+      "message": "Cannot start norepinephrine without IV/IO access."
+    },
+    {
+      "id": "pressors_after_initial_fluids",
+      "type": "soft",
+      "action": "start_norepinephrine",
+      "requires": ["fluidsStarted"],
+      "message": "Vasopressor started before any initial crystalloid resuscitation.",
+      "penalty": 4,
+      "onFailureEffect": "none"
+    }
+  ],
+  "narrativeBeats": [
+    {
+      "id": "shock-persistence",
+      "atSeconds": 100,
+      "message": "RN: Repeat pressure is still in the 70s systolic.",
+      "priority": "urgent",
+      "condition": "ifNoFluids",
+      "requiresAcknowledgement": true
+    },
+    {
+      "id": "antibiotic-clock",
+      "atSeconds": 180,
+      "message": "Pharmacist: Antibiotics are available when you are ready.",
+      "priority": "info",
+      "condition": "ifNoAntibiotics"
+    },
+    {
+      "id": "pressor-consideration",
+      "atSeconds": 260,
+      "message": "RN: Two liters are in and MAP is still marginal.",
+      "priority": "urgent",
+      "condition": "ifNoVasopressor",
+      "requiresAcknowledgement": true
+    },
+    {
+      "id": "reassessment-needed",
+      "atSeconds": 360,
+      "message": "Team: Initial interventions are done; we need a perfusion reassessment.",
+      "priority": "info",
+      "condition": "ifShockUnresolved"
+    }
+  ],
+  "outcomes": {
+    "deteriorateAfterSeconds": 720,
+    "maxPenaltyBeforeDeterioration": 18
+  },
+  "debriefRules": {
+    "criticalActions": [
+      "establish_iv",
+      "send_lactate",
+      "draw_blood_cultures",
+      "give_fluid_bolus",
+      "give_antibiotics",
+      "start_norepinephrine",
+      "reassess_perfusion"
+    ],
+    "goodDecisionActions": [
+      "start_transfer_to_bed",
+      "start_ems_handoff",
+      "attach_monitor_leads",
+      "start_oxygen",
+      "establish_iv",
+      "send_lactate",
+      "draw_blood_cultures",
+      "give_fluid_bolus",
+      "give_antibiotics",
+      "start_norepinephrine",
+      "reassess_perfusion",
+      "call_icu"
+    ],
+    "algorithmDeviationActions": [
+      "give_antibiotics"
+    ],
+    "metricLabels": {
+      "timeToMonitor": "Time to monitor",
+      "timeToAccess": "Time to access",
+      "timeToLactate": "Time to lactate",
+      "timeToCultures": "Time to cultures",
+      "timeToFluids": "Time to fluids",
+      "timeToAntibiotics": "Time to antibiotics",
+      "timeToVasopressor": "Time to vasopressor",
+      "timeToReassessment": "Time to reassessment",
+      "algorithmDeviationCount": "Algorithm deviations"
+    }
+  },
+  "teachingPoints": [
+    "Septic shock rewards parallel work: access, monitoring, cultures, lactate, fluids, antibiotics, and pressor preparation can overlap.",
+    "Cultures matter, but antibiotics should not be delayed when the patient is crashing.",
+    "Persistent hypotension after initial fluids should trigger vasopressor support rather than endless fluid cycling.",
+    "The case is not complete until perfusion is reassessed and disposition is moving."
+  ]
+}
